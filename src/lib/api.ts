@@ -23,6 +23,8 @@ export const api = {
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),
   undoFinish: (timingId: number) => invoke<void>('undo_finish', { timingId }),
   updateOperatorId: (id: string) => invoke<void>('update_operator_id', { id }),
+  updateConfig: (patch: Partial<AppConfig>) =>
+    invoke<AppConfig>('update_config', { patch }),
   startDeviceLogin: () => invoke<DeviceCodeResponse>('start_device_login'),
   isAuthenticated: () => invoke<boolean>('is_authenticated'),
   logout: () => invoke<void>('logout'),

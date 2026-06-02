@@ -11,11 +11,12 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
-    "@tauri-apps/plugin-dialog": "^2",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@skeletonlabs/skeleton": "^4",
-    "@skeletonlabs/skeleton-svelte": "^4"
+    "@skeletonlabs/skeleton-svelte": "^4",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

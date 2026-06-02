@@ -44,24 +44,56 @@
     if (!resp) return;
     openUrl(resp.verification_uri_complete ?? resp.verification_uri);
   }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') onClose(false);
+  }
 </script>
 
-<div class="fixed inset-0 bg-black/90 flex items-center justify-center" role="dialog">
-  <div class="bg-zinc-900 p-8 max-w-xl w-full text-center">
-    <h3 class="text-3xl mb-4">Accedi via browser</h3>
-    {#if !resp && !error}
-      <p>Caricamento…</p>
-    {:else if error}
-      <p class="text-red-400 text-xl">{error}</p>
-    {:else if resp}
-      <p class="opacity-80">Visita:</p>
-      <button class="text-2xl underline mb-4 break-all" onclick={openVerification}>
-        {resp.verification_uri}
-      </button>
-      <p class="opacity-80">e inserisci il codice:</p>
-      <div class="text-6xl font-mono tracking-widest my-6">{resp.user_code}</div>
-      <p class="opacity-60">Scade in {countdown}s</p>
-    {/if}
-    <button class="btn preset-tonal mt-4" onclick={() => onClose(false)}>Annulla</button>
+<svelte:window onkeydown={onKey} />
+
+<div class="modal-backdrop" role="dialog">
+  <div class="panel-2 w-full max-w-xl">
+    <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
+      <div class="hud-strong" style="color: var(--accent-running)">ACCEDI VIA BROWSER</div>
+      <button class="btn-base btn-ghost text-xs" onclick={() => onClose(false)}>ESC</button>
+    </div>
+
+    <div class="p-6">
+      {#if !resp && !error}
+        <div class="hud" style="color: var(--fg-2)">RICHIESTA DEVICE CODE…</div>
+      {:else if error}
+        <div class="hud mb-2" style="color: var(--accent-finish)">ERRORE</div>
+        <div class="text-base" style="color: var(--fg-1)">{error}</div>
+      {:else if resp}
+        <div class="hud mb-2">VISITA URL</div>
+        <button
+          class="text-base mb-6 break-all underline text-left w-full"
+          style="color: var(--accent-running)"
+          onclick={openVerification}
+        >
+          {resp.verification_uri_complete ?? resp.verification_uri}
+        </button>
+
+        <div class="hud mb-2">INSERISCI CODICE</div>
+        <div
+          class="chronodial num text-7xl tracking-[0.15em] py-4 px-6 panel"
+          data-state="running"
+          style="text-align: center"
+        >
+          {resp.user_code}
+        </div>
+
+        <div class="flex items-center justify-between mt-6">
+          <div class="hud">SCADENZA</div>
+          <div class="num text-xl" style="color: {countdown > 60 ? 'var(--fg-0)' : 'var(--accent-finish)'}">
+            {countdown}s
+          </div>
+        </div>
+        <div class="hud mt-1" style="color: var(--fg-3)">in attesa di conferma…</div>
+      {/if}
+
+      <button class="btn-base mt-6 w-full py-3" onclick={() => onClose(false)}>ANNULLA</button>
+    </div>
   </div>
 </div>

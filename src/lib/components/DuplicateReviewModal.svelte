@@ -7,39 +7,69 @@
   let groups = $state<any[]>([]);
   let loading = $state(true);
 
-  onMount(async () => {
-    try {
-      groups = await api.getDuplicateGroups();
-    } finally {
-      loading = false;
-    }
-  });
+  async function refresh() {
+    loading = true;
+    try { groups = await api.getDuplicateGroups(); } finally { loading = false; }
+  }
+
+  onMount(() => { refresh(); });
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape') onClose();
+  }
 </script>
 
-<div class="fixed inset-0 bg-black/85 overflow-auto p-6" role="dialog">
-  <div class="max-w-4xl mx-auto bg-zinc-900 p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-3xl">Duplicati da revisionare</h3>
-      <button class="btn preset-tonal" onclick={onClose}>Chiudi</button>
+<svelte:window onkeydown={onKey} />
+
+<div class="modal-backdrop overflow-auto p-4" role="dialog">
+  <div class="panel-2 w-full max-w-4xl mx-auto">
+    <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
+      <div class="flex items-center gap-3">
+        <span style="color: var(--accent-dup)">⚠</span>
+        <div class="hud-strong" style="color: var(--accent-dup)">DUPLICATI DA REVISIONARE</div>
+        <div class="hud">·</div>
+        <div class="hud">{groups.length}</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-base btn-ghost text-xs px-2 py-1" onclick={refresh}>↻ AGGIORNA</button>
+        <button class="btn-base btn-ghost text-xs" onclick={onClose}>ESC</button>
+      </div>
     </div>
-    {#if loading}
-      <p class="opacity-70">Caricamento…</p>
-    {:else if groups.length === 0}
-      <p class="opacity-70">Nessun duplicato flaggato.</p>
-    {:else}
-      {#each groups as g (g.group_id)}
-        <div class="border border-yellow-500/40 p-4 mb-4">
-          <p class="text-xl">Pettorale #{g.bib_number ?? '?'} · delta {g.delta_ms}ms</p>
-          <ul class="mt-2">
-            {#each g.timings as t (t.id)}
-              <li class="flex justify-between py-1">
-                <span>{t.operator_id}</span>
-                <span class="font-mono">{formatMsToHms(t.total_time_ms ?? 0)}</span>
-              </li>
-            {/each}
-          </ul>
+
+    <div class="p-4">
+      {#if loading}
+        <div class="hud" style="color: var(--fg-2)">CARICAMENTO…</div>
+      {:else if groups.length === 0}
+        <div class="hud" style="color: var(--accent-start)">✓ NESSUN DUPLICATO FLAGGATO</div>
+      {:else}
+        <div class="flex flex-col gap-3">
+          {#each groups as g (g.group_id)}
+            <div class="panel" style="border-color: var(--accent-dup)">
+              <div class="flex items-center justify-between px-4 py-2 border-b" style="border-color: var(--line-2)">
+                <div class="flex items-center gap-3">
+                  <span class="hud-strong" style="color: var(--accent-dup)">
+                    PETTORALE #{g.bib_number ?? '?'}
+                  </span>
+                  <span class="hud">Δ</span>
+                  <span class="num text-lg" style="color: var(--fg-0)">{g.delta_ms}ms</span>
+                </div>
+                <span class="hud" style="color: var(--fg-3)">{g.timings.length} letture</span>
+              </div>
+              <div>
+                {#each g.timings as t (t.id)}
+                  <div class="ticker-row">
+                    <span class="op-chip" style="color: var(--fg-2)">{t.operator_id}</span>
+                    <span class="num" style="color: var(--fg-0)">
+                      {formatMsToHms(t.total_time_ms ?? 0)}
+                    </span>
+                    <span class="hud ml-auto" style="color: var(--fg-3)">id #{t.id}</span>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/each}
         </div>
-      {/each}
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>

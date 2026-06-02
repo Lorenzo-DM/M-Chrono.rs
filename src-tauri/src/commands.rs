@@ -168,6 +168,36 @@ pub async fn update_operator_id(ctx: State<'_, AppCtx>, id: String) -> Result<()
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+pub struct ConfigPatch {
+    pub oidc_issuer_url: Option<String>,
+    pub oidc_client_id: Option<String>,
+    pub oidc_scopes: Option<String>,
+    pub api_base_url: Option<String>,
+    pub sync_interval_secs: Option<u64>,
+    pub operator_id: Option<String>,
+    pub dedup_window_ms: Option<i64>,
+    pub dedup_warn_delta_ms: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn update_config(
+    ctx: State<'_, AppCtx>,
+    patch: ConfigPatch,
+) -> Result<crate::config::AppConfig, AppError> {
+    let mut cfg = ctx.config.write().await;
+    if let Some(v) = patch.oidc_issuer_url   { cfg.oidc_issuer_url = v; }
+    if let Some(v) = patch.oidc_client_id    { cfg.oidc_client_id = v; }
+    if let Some(v) = patch.oidc_scopes       { cfg.oidc_scopes = v; }
+    if let Some(v) = patch.api_base_url      { cfg.api_base_url = v; }
+    if let Some(v) = patch.sync_interval_secs { cfg.sync_interval_secs = v; }
+    if let Some(v) = patch.operator_id       { cfg.operator_id = v; }
+    if let Some(v) = patch.dedup_window_ms   { cfg.dedup_window_ms = v; }
+    if let Some(v) = patch.dedup_warn_delta_ms { cfg.dedup_warn_delta_ms = v; }
+    cfg.save(&ctx.config_path)?;
+    Ok(cfg.clone())
+}
+
 #[tauri::command]
 pub async fn start_device_login(
     app: AppHandle,
