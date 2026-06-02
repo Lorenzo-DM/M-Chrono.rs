@@ -11,6 +11,16 @@ mod sync;
 mod api;
 mod auth;
 mod export;
+mod app_ctx;
+
+use crate::app_ctx::AppCtx;
+use crate::config::AppConfig;
+use crate::db::{migrations, repo::Repo, Db};
+use crate::state::{bootstrap_from_db, new_shared};
+use crate::timer::clock::SystemClock;
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,6 +32,33 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            let app_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&app_dir)?;
+            let db_path = app_dir.join("race.db");
+            let config_path = app_dir.join("config.json");
+
+            let db = Db::open(&db_path)?;
+            migrations::run(&db.conn.lock().unwrap())?;
+
+            let clock = Arc::new(SystemClock);
+            let repo = Arc::new(Repo::with_clock(db.conn.clone(), clock.clone()));
+            let config = Arc::new(tokio::sync::RwLock::new(AppConfig::load_or_default(&config_path)));
+
+            let state = new_shared();
+            let snap = bootstrap_from_db(&repo, &*clock)?;
+            tauri::async_runtime::block_on(async {
+                *state.write().await = snap;
+            });
+
+            let http = Arc::new(reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(15))
+                .build()?);
+
+            app.manage(AppCtx { state, repo, clock, config, config_path, http });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
