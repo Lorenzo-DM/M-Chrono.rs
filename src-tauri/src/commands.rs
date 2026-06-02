@@ -1,6 +1,6 @@
 use crate::app_ctx::AppCtx;
 use crate::error::AppError;
-use crate::models::{Athlete, Course, PendingFinish, Timing};
+use crate::models::{Athlete, Course, DeviceCodeResponse, PendingFinish, Timing};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
@@ -165,5 +165,44 @@ pub async fn update_operator_id(ctx: State<'_, AppCtx>, id: String) -> Result<()
     let mut cfg = ctx.config.write().await;
     cfg.operator_id = id;
     cfg.save(&ctx.config_path)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn start_device_login(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+) -> Result<DeviceCodeResponse, AppError> {
+    let cfg = ctx.config.read().await.clone();
+    let resp = ctx.auth.start_device_login(&cfg).await?;
+    let interval = resp.interval;
+    let auth = ctx.auth.clone();
+    let cfg_clone = cfg.clone();
+    let app_clone = app.clone();
+    tauri::async_runtime::spawn(async move {
+        match auth.poll_until_authorized(&cfg_clone, interval).await {
+            Ok(_) => {
+                let _ = app_clone.emit("auth:success", ());
+            }
+            Err(e) => {
+                let _ = app_clone.emit(
+                    "auth:failed",
+                    serde_json::json!({ "reason": e.to_string() }),
+                );
+            }
+        }
+    });
+    Ok(resp)
+}
+
+#[tauri::command]
+pub fn is_authenticated(ctx: State<'_, AppCtx>) -> bool {
+    ctx.auth.is_authenticated()
+}
+
+#[tauri::command]
+pub async fn logout(app: AppHandle, ctx: State<'_, AppCtx>) -> Result<(), AppError> {
+    ctx.auth.logout()?;
+    let _ = app.emit("auth:logged_out", ());
     Ok(())
 }

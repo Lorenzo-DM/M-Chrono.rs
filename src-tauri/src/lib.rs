@@ -56,7 +56,9 @@ pub fn run() {
                 .timeout(Duration::from_secs(15))
                 .build()?);
 
-            app.manage(AppCtx { state, repo, clock, config, config_path, http });
+            let auth = Arc::new(crate::auth::AuthService::new(http.clone(), clock.clone()));
+
+            app.manage(AppCtx { state, repo, clock, config, config_path, http, auth });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -73,6 +75,9 @@ pub fn run() {
             commands::withdraw_athlete,
             commands::undo_finish,
             commands::update_operator_id,
+            commands::start_device_login,
+            commands::is_authenticated,
+            commands::logout,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

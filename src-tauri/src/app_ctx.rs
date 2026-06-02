@@ -1,3 +1,4 @@
+use crate::auth::AuthService;
 use crate::config::AppConfig;
 use crate::db::repo::Repo;
 use crate::state::SharedState;
@@ -12,4 +13,5 @@ pub struct AppCtx {
     pub config: Arc<RwLock<AppConfig>>,
     pub config_path: std::path::PathBuf,
     pub http: Arc<reqwest::Client>,
+    pub auth: Arc<AuthService>,
 }
