@@ -1,3 +1,17 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod config;
+mod error;
+mod models;
+mod state;
+mod commands;
+mod db;
+mod timer;
+mod sync;
+mod api;
+mod auth;
+mod export;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
