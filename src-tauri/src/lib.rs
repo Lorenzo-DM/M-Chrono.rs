@@ -59,6 +59,22 @@ pub fn run() {
             let auth = Arc::new(crate::auth::AuthService::new(http.clone(), clock.clone()));
 
             app.manage(AppCtx { state, repo, clock, config, config_path, http, auth });
+
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let app_handle = app.handle().clone();
+            let ctx_state = app.state::<AppCtx>();
+            let ctx_inner = ctx_state.inner();
+            crate::sync::spawn(
+                app_handle,
+                ctx_inner.state.clone(),
+                ctx_inner.repo.clone(),
+                ctx_inner.http.clone(),
+                ctx_inner.auth.clone(),
+                ctx_inner.config.clone(),
+                ctx_inner.clock.clone(),
+                cancel,
+            );
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
