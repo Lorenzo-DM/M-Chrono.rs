@@ -102,6 +102,75 @@ fn finish_athlete_inner(
     Ok(updated)
 }
 
+use crate::models::PendingFinish;
+
+pub async fn capture_pending_finish(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    course_id: i64,
+    operator_id: &str,
+) -> AppResult<PendingFinish> {
+    let ts_ms = clock.now_ms();
+    let p = repo.insert_pending_finish(course_id, ts_ms, operator_id)?;
+    state.write().await.pending.push(p.clone());
+    Ok(p)
+}
+
+pub async fn assign_pending(
+    state: &SharedState,
+    repo: &Repo,
+    pending_id: i64,
+    bib: i64,
+    operator_id: &str,
+) -> AppResult<Timing> {
+    let mut s = state.write().await;
+    let pending = s.pending.iter().find(|p| p.id == pending_id).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("pending {}", pending_id)))?;
+    let athlete = s.athletes_by_bib.get(&bib).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("bib {}", bib)))?;
+    let timing = repo.find_running_timing_for_athlete(athlete.id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState(
+            format!("no running timing for athlete {}", athlete.id)))?;
+    let start = timing.start_timestamp_ms.unwrap_or(0);
+    let total = pending.finish_timestamp_ms - start;
+    repo.update_finish(timing.id, pending.finish_timestamp_ms, total)?;
+    repo.mark_pending_assigned(pending_id)?;
+    let updated = repo.get_timing(timing.id)?.expect("updated");
+    s.timings.insert(updated.id, updated.clone());
+    s.pending.retain(|p| p.id != pending_id);
+    Ok(updated)
+}
+
+pub async fn withdraw_athlete(
+    state: &SharedState,
+    repo: &Repo,
+    bib: i64,
+    operator_id: &str,
+) -> AppResult<()> {
+    let mut s = state.write().await;
+    let athlete = s.athletes_by_bib.get(&bib).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("bib {}", bib)))?;
+    let timing = repo.find_running_timing_for_athlete(athlete.id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState("no running timing".into()))?;
+    repo.update_status(timing.id, TimingStatus::Withdrawn)?;
+    let updated = repo.get_timing(timing.id)?.expect("updated");
+    s.timings.insert(updated.id, updated);
+    Ok(())
+}
+
+pub async fn undo_finish(
+    state: &SharedState,
+    repo: &Repo,
+    timing_id: i64,
+) -> AppResult<()> {
+    let mut s = state.write().await;
+    repo.undo_finish(timing_id)?;
+    let updated = repo.get_timing(timing_id)?.ok_or_else(|| AppError::NotFound("timing".into()))?;
+    s.timings.insert(updated.id, updated);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests_finish {
     use super::*;
@@ -133,6 +202,45 @@ mod tests_finish {
         let (state, repo, clock) = setup().await;
         let err = finish_by_bib(&state, &repo, &*clock, 1, "PC-A").await.unwrap_err();
         assert!(matches!(err, AppError::InvalidState(_)));
+    }
+}
+
+#[cfg(test)]
+mod tests_pending {
+    use super::*;
+    use super::tests::setup;
+
+    #[tokio::test]
+    async fn capture_and_assign_pending() {
+        let (state, repo, clock) = setup().await;
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(4_000);
+        let p = capture_pending_finish(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        let t = assign_pending(&state, &repo, p.id, 2, "PC-A").await.unwrap();
+        assert_eq!(t.total_time_ms, Some(4_000));
+        assert!(state.read().await.pending.is_empty());
+    }
+
+    #[tokio::test]
+    async fn withdraw_changes_status() {
+        let (state, repo, clock) = setup().await;
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        withdraw_athlete(&state, &repo, 1, "PC-A").await.unwrap();
+        let s = state.read().await;
+        let t = s.timings.values().find(|t| t.athlete_id == Some(1)).unwrap();
+        assert_eq!(t.status, TimingStatus::Withdrawn);
+    }
+
+    #[tokio::test]
+    async fn undo_finish_reverts_to_running() {
+        let (state, repo, clock) = setup().await;
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(1_000);
+        let t = finish_by_bib(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        undo_finish(&state, &repo, t.id).await.unwrap();
+        let after = state.read().await.timings.get(&t.id).cloned().unwrap();
+        assert_eq!(after.status, TimingStatus::Running);
+        assert!(after.finish_timestamp_ms.is_none());
     }
 }
 
