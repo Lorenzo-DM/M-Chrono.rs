@@ -24,6 +24,15 @@ pub struct ResultRow {
     pub duplicate_flagged: bool,
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DuplicateGroup {
+    pub group_id: String,
+    pub athlete_id: Option<i64>,
+    pub bib_number: Option<i64>,
+    pub timings: Vec<Timing>,
+    pub delta_ms: i64,
+}
+
 pub struct Repo {
     pub conn: Arc<Mutex<Connection>>,
     pub clock: Arc<dyn ClockProvider>,
@@ -448,6 +457,60 @@ impl Repo {
         )?;
         let rows = stmt.query_map([], Self::map_timing)?;
         Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn list_duplicate_groups(&self) -> AppResult<Vec<DuplicateGroup>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT t.duplicate_group_id, t.athlete_id, a.bib_number, t.id, t.remote_id,
+                    t.course_id, t.start_timestamp_ms, t.finish_timestamp_ms,
+                    t.status, t.total_time_ms, t.operator_id,
+                    t.duplicate_flagged, t.synced
+             FROM timings t LEFT JOIN athletes a ON a.id = t.athlete_id
+             WHERE t.duplicate_group_id IS NOT NULL AND t.duplicate_group_id != ''
+               AND t.duplicate_flagged = 1
+             ORDER BY t.duplicate_group_id, t.finish_timestamp_ms",
+        )?;
+        let mut groups: std::collections::BTreeMap<String, DuplicateGroup> = Default::default();
+        let rows = stmt.query_map([], |r| {
+            let gid: String = r.get(0)?;
+            let aid: Option<i64> = r.get(1)?;
+            let bib: Option<i64> = r.get(2)?;
+            let status_str: String = r.get(8)?;
+            let t = Timing {
+                id: r.get(3)?,
+                remote_id: r.get(4)?,
+                athlete_id: aid,
+                course_id: r.get(5)?,
+                start_timestamp_ms: r.get(6)?,
+                finish_timestamp_ms: r.get(7)?,
+                status: TimingStatus::from_str(&status_str).unwrap_or(TimingStatus::Finished),
+                total_time_ms: r.get(9)?,
+                operator_id: r.get(10)?,
+                duplicate_group_id: Some(gid.clone()),
+                duplicate_flagged: r.get::<_, i64>(11)? != 0,
+                synced: r.get::<_, i64>(12)? != 0,
+            };
+            Ok((gid, aid, bib, t))
+        })?;
+        for row in rows {
+            let (gid, aid, bib, t) = row?;
+            let g = groups.entry(gid.clone()).or_insert(DuplicateGroup {
+                group_id: gid,
+                athlete_id: aid,
+                bib_number: bib,
+                timings: Vec::new(),
+                delta_ms: 0,
+            });
+            g.timings.push(t);
+        }
+        for g in groups.values_mut() {
+            let ts: Vec<i64> = g.timings.iter().filter_map(|t| t.finish_timestamp_ms).collect();
+            if let (Some(min), Some(max)) = (ts.iter().min(), ts.iter().max()) {
+                g.delta_ms = max - min;
+            }
+        }
+        Ok(groups.into_values().collect())
     }
 
     pub fn list_all_pending_open(&self) -> AppResult<Vec<PendingFinish>> {

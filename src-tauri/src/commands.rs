@@ -233,3 +233,14 @@ pub async fn fetch_remote_data(ctx: State<'_, AppCtx>) -> Result<FetchSummary, A
         athletes_count: athletes.len(),
     })
 }
+
+#[tauri::command]
+pub async fn get_duplicate_groups(
+    ctx: State<'_, AppCtx>,
+) -> Result<Vec<crate::db::repo::DuplicateGroup>, AppError> {
+    let repo = ctx.repo.clone();
+    let groups = tokio::task::spawn_blocking(move || repo.list_duplicate_groups())
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    Ok(groups)
+}

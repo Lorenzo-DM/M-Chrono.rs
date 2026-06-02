@@ -95,6 +95,7 @@ pub fn run() {
             commands::is_authenticated,
             commands::logout,
             commands::fetch_remote_data,
+            commands::get_duplicate_groups,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
