@@ -1,0 +1,6 @@
+@import "tailwindcss";
+@import "@skeletonlabs/skeleton";
+
+:root { color-scheme: dark; }
+html, body { @apply bg-black text-white; }
+.tabular-fixed { font-variant-numeric: tabular-nums; }
