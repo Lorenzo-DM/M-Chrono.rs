@@ -4,6 +4,7 @@
   import { courses, config } from './lib/stores';
   import Header from './lib/components/Header.svelte';
   import CoursePage from './lib/components/CoursePage.svelte';
+  import SettingsPage from './lib/components/SettingsPage.svelte';
 
   type View = { kind: 'home' } | { kind: 'course'; id: number } | { kind: 'settings' };
   let view = $state<View>({ kind: 'home' });
@@ -50,8 +51,7 @@
         <button class="btn preset-tonal" onclick={() => view = { kind: 'home' }}>← Home</button>
       {/if}
     {:else}
-      <p>Settings page placeholder</p>
-      <button class="btn preset-tonal" onclick={() => view = { kind: 'home' }}>← Home</button>
+      <SettingsPage onBack={() => view = { kind: 'home' }} />
     {/if}
   </main>
 {/if}

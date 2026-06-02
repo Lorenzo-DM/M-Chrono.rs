@@ -1,0 +1,40 @@
+<script lang="ts">
+  import { api } from '../api';
+  import { config } from '../stores';
+
+  let { onBack }: { onBack: () => void } = $props();
+  let operatorId = $state($config?.operator_id ?? '');
+  let saving = $state(false);
+  let saved = $state(false);
+
+  async function save() {
+    saving = true;
+    saved = false;
+    try {
+      await api.updateOperatorId(operatorId);
+      const cfg = await api.getConfig();
+      config.set(cfg);
+      saved = true;
+    } finally {
+      saving = false;
+    }
+  }
+</script>
+
+<div class="flex items-center mb-4 gap-4">
+  <button class="btn preset-tonal" onclick={onBack}>← Home</button>
+  <h2 class="text-3xl font-bold">Settings</h2>
+</div>
+
+<section class="max-w-md flex flex-col gap-4">
+  <label class="flex flex-col gap-1">
+    <span class="text-xl">Operator ID</span>
+    <input bind:value={operatorId}
+           class="p-3 bg-black border-2 border-white text-xl"
+           placeholder="PC-A" />
+  </label>
+  <button class="btn preset-filled text-xl py-3" disabled={saving} onclick={save}>
+    {saving ? 'Salvataggio…' : 'Salva'}
+  </button>
+  {#if saved}<p class="text-green-400">Salvato.</p>{/if}
+</section>
