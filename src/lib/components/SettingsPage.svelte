@@ -2,6 +2,7 @@
   import { api } from '../api';
   import { config, isAuthenticated as isAuthStore, courses } from '../stores';
   import DeviceLoginModal from './DeviceLoginModal.svelte';
+  import { save as saveDialog } from '@tauri-apps/plugin-dialog';
 
   let { onBack }: { onBack: () => void } = $props();
   let operatorId = $state($config?.operator_id ?? '');
@@ -76,6 +77,27 @@
             }
           }}>
     Sincronizza atleti/percorsi
+  </button>
+</section>
+
+<section class="max-w-md mt-6">
+  <h3 class="text-xl mb-2">Esporta risultati</h3>
+  <button class="btn preset-filled"
+          onclick={async () => {
+            const date = new Date().toISOString().slice(0, 10);
+            const path = await saveDialog({
+              defaultPath: `risultati_${date}.xlsx`,
+              filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+            });
+            if (!path) return;
+            try {
+              const s = await api.exportResultsXlsx(path);
+              alert(`Esportati ${s.athletes_count} atleti su ${s.courses_count} percorsi`);
+            } catch (e: any) {
+              alert(e?.message ?? String(e));
+            }
+          }}>
+    Esporta XLSX
   </button>
 </section>
 

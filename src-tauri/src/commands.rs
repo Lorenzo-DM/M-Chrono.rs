@@ -244,3 +244,15 @@ pub async fn get_duplicate_groups(
         .map_err(|e| AppError::Internal(e.to_string()))??;
     Ok(groups)
 }
+
+#[tauri::command]
+pub async fn export_results_xlsx(
+    ctx: State<'_, AppCtx>,
+    path: String,
+) -> Result<crate::export::xlsx::ExportSummary, AppError> {
+    let repo = ctx.repo.clone();
+    let p = std::path::PathBuf::from(path);
+    tokio::task::spawn_blocking(move || crate::export::xlsx::write_results(&repo, &p))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+}

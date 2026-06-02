@@ -28,4 +28,8 @@ export const api = {
   logout: () => invoke<void>('logout'),
   fetchRemoteData: () => invoke<{ courses_count: number; athletes_count: number }>('fetch_remote_data'),
   getDuplicateGroups: () => invoke<any[]>('get_duplicate_groups'),
+  exportResultsXlsx: (path: string) =>
+    invoke<{ path: string; courses_count: number; athletes_count: number }>(
+      'export_results_xlsx', { path }
+    ),
 };
