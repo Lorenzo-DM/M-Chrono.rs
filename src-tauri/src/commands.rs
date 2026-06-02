@@ -1,8 +1,8 @@
 use crate::app_ctx::AppCtx;
 use crate::error::AppError;
-use crate::models::{Athlete, Course, PendingFinish};
+use crate::models::{Athlete, Course, PendingFinish, Timing};
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize, Clone)]
 pub struct CourseSnapshot {
@@ -91,4 +91,79 @@ pub async fn get_pending_finishes(
 #[tauri::command]
 pub async fn get_config(ctx: State<'_, AppCtx>) -> Result<crate::config::AppConfig, AppError> {
     Ok(ctx.config.read().await.clone())
+}
+
+async fn current_operator(ctx: &AppCtx) -> Result<String, AppError> {
+    let cfg = ctx.config.read().await;
+    if cfg.operator_id.is_empty() {
+        return Err(AppError::InvalidState("operator_id not configured".into()));
+    }
+    Ok(cfg.operator_id.clone())
+}
+
+#[tauri::command]
+pub async fn start_course(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64)
+    -> Result<i64, AppError> {
+    let op = current_operator(&ctx).await?;
+    let ts = crate::timer::start_course(&ctx.state, &ctx.repo, &*ctx.clock, course_id, &op).await?;
+    let _ = app.emit(
+        "course:started",
+        serde_json::json!({ "course_id": course_id, "started_at_ms": ts }),
+    );
+    Ok(ts)
+}
+
+#[tauri::command]
+pub async fn finish_by_bib(app: AppHandle, ctx: State<'_, AppCtx>, bib: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::finish_by_bib(&ctx.state, &ctx.repo, &*ctx.clock, bib, &op).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+#[tauri::command]
+pub async fn finish_by_athlete_id(app: AppHandle, ctx: State<'_, AppCtx>, athlete_id: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::finish_by_athlete_id(&ctx.state, &ctx.repo, &*ctx.clock, athlete_id, &op).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+#[tauri::command]
+pub async fn capture_pending_finish(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64)
+    -> Result<PendingFinish, AppError> {
+    let op = current_operator(&ctx).await?;
+    let p = crate::timer::capture_pending_finish(&ctx.state, &ctx.repo, &*ctx.clock, course_id, &op).await?;
+    let _ = app.emit("pending:captured", &p);
+    Ok(p)
+}
+
+#[tauri::command]
+pub async fn assign_pending(app: AppHandle, ctx: State<'_, AppCtx>, pending_id: i64, bib: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::assign_pending(&ctx.state, &ctx.repo, pending_id, bib, &op).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+#[tauri::command]
+pub async fn withdraw_athlete(ctx: State<'_, AppCtx>, bib: i64) -> Result<(), AppError> {
+    let op = current_operator(&ctx).await?;
+    crate::timer::withdraw_athlete(&ctx.state, &ctx.repo, bib, &op).await
+}
+
+#[tauri::command]
+pub async fn undo_finish(ctx: State<'_, AppCtx>, timing_id: i64) -> Result<(), AppError> {
+    crate::timer::undo_finish(&ctx.state, &ctx.repo, timing_id).await
+}
+
+#[tauri::command]
+pub async fn update_operator_id(ctx: State<'_, AppCtx>, id: String) -> Result<(), AppError> {
+    let mut cfg = ctx.config.write().await;
+    cfg.operator_id = id;
+    cfg.save(&ctx.config_path)?;
+    Ok(())
 }

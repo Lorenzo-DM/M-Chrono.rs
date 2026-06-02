@@ -65,6 +65,14 @@ pub fn run() {
             commands::get_athletes_by_course,
             commands::get_pending_finishes,
             commands::get_config,
+            commands::start_course,
+            commands::finish_by_bib,
+            commands::finish_by_athlete_id,
+            commands::capture_pending_finish,
+            commands::assign_pending,
+            commands::withdraw_athlete,
+            commands::undo_finish,
+            commands::update_operator_id,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
