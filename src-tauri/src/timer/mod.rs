@@ -48,6 +48,94 @@ pub async fn start_course(
     Ok(ts_ms)
 }
 
+pub async fn finish_by_bib(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    bib: i64,
+    operator_id: &str,
+) -> AppResult<Timing> {
+    let ts_ms = clock.now_ms();
+    let mut s = state.write().await;
+    let athlete = match s.athletes_by_bib.get(&bib).cloned() {
+        Some(a) => a,
+        None => {
+            // capture as pending automatically
+            let course_default = s.courses.keys().next().copied().unwrap_or(0);
+            drop(s);
+            let p = repo.insert_pending_finish(course_default, ts_ms, operator_id)?;
+            state.write().await.pending.push(p);
+            return Err(AppError::NotFound(format!("bib {} not found (saved as pending)", bib)));
+        }
+    };
+    finish_athlete_inner(&mut s, repo, ts_ms, athlete.id, operator_id)
+}
+
+pub async fn finish_by_athlete_id(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    athlete_id: i64,
+    operator_id: &str,
+) -> AppResult<Timing> {
+    let ts_ms = clock.now_ms();
+    let mut s = state.write().await;
+    finish_athlete_inner(&mut s, repo, ts_ms, athlete_id, operator_id)
+}
+
+fn finish_athlete_inner(
+    s: &mut RaceState,
+    repo: &Repo,
+    ts_ms: i64,
+    athlete_id: i64,
+    operator_id: &str,
+) -> AppResult<Timing> {
+    let timing = repo.find_running_timing_for_athlete(athlete_id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState(
+            format!("no running timing for athlete {} on operator {}", athlete_id, operator_id)))?;
+    let start = timing.start_timestamp_ms.ok_or_else(||
+        AppError::InvalidState("timing has no start".into()))?;
+    let total = ts_ms - start;
+    repo.update_finish(timing.id, ts_ms, total)?;
+    let updated = repo.get_timing(timing.id)?.expect("just updated");
+    s.timings.insert(updated.id, updated.clone());
+    Ok(updated)
+}
+
+#[cfg(test)]
+mod tests_finish {
+    use super::*;
+    use super::tests::setup;
+
+    #[tokio::test]
+    async fn finish_by_bib_computes_total() {
+        let (state, repo, clock) = setup().await;
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(5_000);
+        let t = finish_by_bib(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        assert_eq!(t.total_time_ms, Some(5_000));
+        assert_eq!(t.status, TimingStatus::Finished);
+    }
+
+    #[tokio::test]
+    async fn finish_unknown_bib_saves_pending() {
+        let (state, repo, clock) = setup().await;
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(3_000);
+        let err = finish_by_bib(&state, &repo, &*clock, 999, "PC-A").await.unwrap_err();
+        assert!(matches!(err, AppError::NotFound(_)));
+        let s = state.read().await;
+        assert_eq!(s.pending.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn finish_when_not_running_errors() {
+        let (state, repo, clock) = setup().await;
+        let err = finish_by_bib(&state, &repo, &*clock, 1, "PC-A").await.unwrap_err();
+        assert!(matches!(err, AppError::InvalidState(_)));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
