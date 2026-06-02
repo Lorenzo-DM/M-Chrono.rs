@@ -437,6 +437,32 @@ impl Repo {
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
     }
+
+    pub fn list_all_timings(&self) -> AppResult<Vec<Timing>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id, athlete_id, course_id, start_timestamp_ms,
+                    finish_timestamp_ms, status, total_time_ms, operator_id,
+                    duplicate_group_id, duplicate_flagged, synced
+             FROM timings"
+        )?;
+        let rows = stmt.query_map([], Self::map_timing)?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn list_all_pending_open(&self) -> AppResult<Vec<PendingFinish>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id, course_id, finish_timestamp_ms, operator_id, assigned, synced
+             FROM pending_finishes WHERE assigned = 0"
+        )?;
+        let rows = stmt.query_map([], |r| Ok(PendingFinish {
+            id: r.get(0)?, remote_id: r.get(1)?, course_id: r.get(2)?,
+            finish_timestamp_ms: r.get(3)?, operator_id: r.get(4)?,
+            assigned: r.get::<_, i64>(5)? != 0, synced: r.get::<_, i64>(6)? != 0,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
 }
 
 #[cfg(test)]
