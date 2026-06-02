@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   Course, Timing, PendingFinish, AthleteRow, DisplaySnapshot,
-  AppConfig,
+  AppConfig, DeviceCodeResponse,
 } from './types';
 
 export const api = {
@@ -23,4 +23,7 @@ export const api = {
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),
   undoFinish: (timingId: number) => invoke<void>('undo_finish', { timingId }),
   updateOperatorId: (id: string) => invoke<void>('update_operator_id', { id }),
+  startDeviceLogin: () => invoke<DeviceCodeResponse>('start_device_login'),
+  isAuthenticated: () => invoke<boolean>('is_authenticated'),
+  logout: () => invoke<void>('logout'),
 };

@@ -1,11 +1,25 @@
 <script lang="ts">
   import { api } from '../api';
   import { config } from '../stores';
+  import DeviceLoginModal from './DeviceLoginModal.svelte';
+  import { isAuthenticated as isAuthStore } from '../stores';
 
   let { onBack }: { onBack: () => void } = $props();
   let operatorId = $state($config?.operator_id ?? '');
   let saving = $state(false);
   let saved = $state(false);
+  let showLogin = $state(false);
+  let authed = $state(false);
+
+  $effect(() => {
+    api.isAuthenticated().then(b => { authed = b; isAuthStore.set(b); });
+  });
+
+  async function doLogout() {
+    await api.logout();
+    authed = false;
+    isAuthStore.set(false);
+  }
 
   async function save() {
     saving = true;
@@ -38,3 +52,21 @@
   </button>
   {#if saved}<p class="text-green-400">Salvato.</p>{/if}
 </section>
+
+<section class="max-w-md mt-6">
+  <h3 class="text-xl mb-2">Autenticazione</h3>
+  {#if authed}
+    <p class="text-green-400 mb-2">Login attivo</p>
+    <button class="btn preset-tonal" onclick={doLogout}>Logout</button>
+  {:else}
+    <p class="opacity-70 mb-2">Non autenticato</p>
+    <button class="btn preset-filled" onclick={() => showLogin = true}>Accedi</button>
+  {/if}
+</section>
+
+{#if showLogin}
+  <DeviceLoginModal onClose={(ok) => {
+    showLogin = false;
+    if (ok) { authed = true; isAuthStore.set(true); }
+  }} />
+{/if}
