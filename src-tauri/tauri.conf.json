@@ -4,18 +4,19 @@
   "version": "0.1.0",
   "identifier": "com.trailtrace.stopwatch",
   "build": {
-    "beforeDevCommand": "trunk serve",
+    "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "trunk build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "trailtrace-stopwatch",
-        "width": 800,
-        "height": 600
+        "title": "Trail Race Timing",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
       }
     ],
     "security": {
