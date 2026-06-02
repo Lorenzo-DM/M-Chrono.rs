@@ -21,13 +21,32 @@ use crate::timer::clock::SystemClock;
 use std::sync::Arc;
 use std::time::Duration;
 use tauri::Manager;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+
+fn init_tracing(log_dir: &std::path::Path) {
+    std::fs::create_dir_all(log_dir).ok();
+    let file_appender = tracing_appender::rolling::RollingFileAppender::new(
+        tracing_appender::rolling::Rotation::DAILY,
+        log_dir,
+        "race.log",
+    );
+    let (nb, guard) = tracing_appender::non_blocking(file_appender);
+    // Keep the guard alive for the process lifetime.
+    Box::leak(Box::new(guard));
+
+    let filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive("trailtrace_stopwatch_lib=info".parse().unwrap());
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(tracing_subscriber::fmt::layer().with_writer(nb))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()
-            .add_directive("trailtrace_stopwatch_lib=info".parse().unwrap()))
-        .init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -35,6 +54,7 @@ pub fn run() {
         .setup(|app| {
             let app_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_dir)?;
+            init_tracing(&app_dir.join("logs"));
             let db_path = app_dir.join("race.db");
             let config_path = app_dir.join("config.json");
 
