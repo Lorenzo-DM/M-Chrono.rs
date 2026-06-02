@@ -2,7 +2,7 @@
 pub fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env()
-            .add_directive("trailtrace_stopwatch=info".parse().unwrap()))
+            .add_directive("trailtrace_stopwatch_lib=info".parse().unwrap()))
         .init();
 
     tauri::Builder::default()
