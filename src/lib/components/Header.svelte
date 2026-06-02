@@ -1,7 +1,10 @@
 <script lang="ts">
   import { syncStatus, config } from '../stores';
 
-  let { onSettings } = $props<{ onSettings: () => void }>();
+  let { onSettings, onDuplicates } = $props<{
+    onSettings: () => void;
+    onDuplicates: () => void;
+  }>();
 </script>
 
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/20">
@@ -16,6 +19,7 @@
       {/if}
       — {$syncStatus.pending_count} pending
     </span>
+    <button class="btn preset-tonal" onclick={onDuplicates} title="Duplicati">⚠</button>
     <button class="btn preset-tonal" onclick={onSettings}>Settings</button>
   </div>
 </header>

@@ -5,10 +5,12 @@
   import Header from './lib/components/Header.svelte';
   import CoursePage from './lib/components/CoursePage.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
+  import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
 
   type View = { kind: 'home' } | { kind: 'course'; id: number } | { kind: 'settings' };
   let view = $state<View>({ kind: 'home' });
   let booted = $state(false);
+  let showDup = $state(false);
 
   onMount(async () => {
     const [c, cfg] = await Promise.all([api.getCourses(), api.getConfig()]);
@@ -23,7 +25,10 @@
     <p class="text-3xl">Caricamento…</p>
   </main>
 {:else}
-  <Header onSettings={() => view = { kind: 'settings' }} />
+  <Header
+    onSettings={() => view = { kind: 'settings' }}
+    onDuplicates={() => showDup = true}
+  />
   <main class="p-6">
     {#if view.kind === 'home'}
       <h2 class="text-3xl mb-4">Percorsi</h2>
@@ -54,4 +59,8 @@
       <SettingsPage onBack={() => view = { kind: 'home' }} />
     {/if}
   </main>
+{/if}
+
+{#if showDup}
+  <DuplicateReviewModal onClose={() => showDup = false} />
 {/if}
