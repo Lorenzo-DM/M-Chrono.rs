@@ -1,29 +1,43 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from './lib/api';
-  import { courses, config, activeCourseId, recentFinishes } from './lib/stores';
+  import { courses, config, activeCourseId, recentFinishes, isAuthenticated } from './lib/stores';
   import { on } from './lib/events';
   import Header from './lib/components/Header.svelte';
   import Workspace from './lib/components/Workspace.svelte';
   import PendingDock from './lib/components/PendingDock.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
+  import IntroFlow from './lib/components/IntroFlow.svelte';
 
-  type View = 'workspace' | 'settings';
+  type View = 'workspace' | 'settings' | 'intro';
   let view = $state<View>('workspace');
   let booted = $state(false);
   let showDup = $state(false);
   let dockCollapsed = $state(false);
 
+  function needsIntro(): boolean {
+    const cfg = $config;
+    if (!cfg) return true;
+    if (!cfg.operator_id?.trim()) return true;
+    if ($courses.length === 0 && !$isAuthenticated) return true;
+    return false;
+  }
+
   onMount(() => {
     let unsubFinish: (() => void) | null = null;
 
     (async () => {
-      const [c, cfg] = await Promise.all([api.getCourses(), api.getConfig()]);
+      const [c, cfg, authed] = await Promise.all([
+        api.getCourses(), api.getConfig(), api.isAuthenticated(),
+      ]);
       courses.set(c);
       config.set(cfg);
+      isAuthenticated.set(authed);
       if (c.length > 0) activeCourseId.set(c[0].id);
+      view = needsIntro() ? 'intro' : 'workspace';
       booted = true;
+
       unsubFinish = await on('athlete:finished', (t: any) => {
         if (!t) return;
         recentFinishes.update(arr => [{
@@ -41,6 +55,7 @@
       const target = e.target as HTMLElement | null;
       const inInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
       if (inInput) return;
+      if (view !== 'workspace') return;
       if (e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key) - 1;
         const list = $courses;
@@ -57,17 +72,31 @@
       unsubFinish?.();
     };
   });
+
+  async function onIntroReady() {
+    // refresh state after intro completes
+    const [c, cfg, authed] = await Promise.all([
+      api.getCourses(), api.getConfig(), api.isAuthenticated(),
+    ]);
+    courses.set(c);
+    config.set(cfg);
+    isAuthenticated.set(authed);
+    if (c.length > 0) activeCourseId.set(c[0].id);
+    view = 'workspace';
+  }
 </script>
 
 {#if !booted}
   <main class="min-h-screen flex items-center justify-center">
     <div class="text-center">
-      <div class="hud-strong text-2xl mb-3" style="color: var(--fg-2)">
-        TRAIL<span style="color: var(--accent-running)">·</span>TRACE
+      <div class="text-2xl font-semibold" style="color: var(--fg-0); letter-spacing: -0.01em">
+        TrailTrace<span style="color: var(--accent-running)">·</span>Chrono
       </div>
-      <div class="hud" style="color: var(--fg-3)">CARICAMENTO…</div>
+      <div class="hud mt-2" style="color: var(--fg-3)">CARICAMENTO…</div>
     </div>
   </main>
+{:else if view === 'intro'}
+  <IntroFlow onReady={onIntroReady} />
 {:else if view === 'settings'}
   <Header
     onSettings={() => view = 'workspace'}
@@ -81,19 +110,17 @@
       onDuplicates={() => showDup = true}
     />
     <div class="flex-1 flex min-h-0">
-      <!-- workspace (left) -->
       <div class="flex-1 min-w-0">
         <Workspace />
       </div>
-      <!-- pending dock (right, collapsible) -->
       {#if !dockCollapsed}
         <div style="width: 340px; min-width: 340px;">
           <PendingDock />
         </div>
       {/if}
       <button
-        class="px-2 py-3 border-l hud-strong text-xs"
-        style="background: var(--bg-2); border-color: var(--line-2); color: var(--fg-2); writing-mode: vertical-rl;"
+        class="px-2 py-3 border-l text-xs font-medium"
+        style="background: var(--bg-2); border-color: var(--line-2); color: var(--fg-2); writing-mode: vertical-rl; letter-spacing: 0.1em;"
         onclick={() => dockCollapsed = !dockCollapsed}
         title={dockCollapsed ? 'Espandi coda' : 'Riduci coda'}
       >

@@ -11,7 +11,8 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "@skeletonlabs/skeleton": "^4",
     "@skeletonlabs/skeleton-svelte": "^4",
     "@tauri-apps/api": "^2",
