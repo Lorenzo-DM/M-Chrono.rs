@@ -5,7 +5,6 @@ pub mod token_store;
 #[cfg(test)]
 mod tests;
 
-pub use device_code::*;
 pub use token_store::*;
 
 use crate::auth::device_code::{poll_once, request as device_request, PollOutcome};

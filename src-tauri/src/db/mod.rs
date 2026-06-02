@@ -16,6 +16,7 @@ impl Db {
         Self::apply_pragmas(&conn)?;
         Ok(Self { conn: Arc::new(Mutex::new(conn)) })
     }
+    #[allow(dead_code)]
     pub fn open_in_memory() -> AppResult<Self> {
         let conn = Connection::open_in_memory()?;
         Self::apply_pragmas(&conn)?;

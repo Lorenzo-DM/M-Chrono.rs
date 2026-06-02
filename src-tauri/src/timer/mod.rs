@@ -2,11 +2,9 @@ pub mod clock;
 
 use crate::db::repo::Repo;
 use crate::error::{AppError, AppResult};
-use crate::models::{Course, Timing, TimingStatus};
+use crate::models::{Timing, TimingStatus};
 use crate::state::{RaceState, SharedState};
 use crate::timer::clock::ClockProvider;
-use std::time::Duration;
-
 pub async fn start_course(
     state: &SharedState,
     repo: &Repo,
@@ -57,17 +55,8 @@ pub async fn finish_by_bib(
 ) -> AppResult<Timing> {
     let ts_ms = clock.now_ms();
     let mut s = state.write().await;
-    let athlete = match s.athletes_by_bib.get(&bib).cloned() {
-        Some(a) => a,
-        None => {
-            // capture as pending automatically
-            let course_default = s.courses.keys().next().copied().unwrap_or(0);
-            drop(s);
-            let p = repo.insert_pending_finish(course_default, ts_ms, operator_id)?;
-            state.write().await.pending.push(p);
-            return Err(AppError::NotFound(format!("bib {} not found (saved as pending)", bib)));
-        }
-    };
+    let athlete = s.athletes_by_bib.get(&bib).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("bib {} not found", bib)))?;
     finish_athlete_inner(&mut s, repo, ts_ms, athlete.id, operator_id)
 }
 
@@ -132,7 +121,8 @@ pub async fn assign_pending(
     let timing = repo.find_running_timing_for_athlete(athlete.id, operator_id)?
         .ok_or_else(|| AppError::InvalidState(
             format!("no running timing for athlete {}", athlete.id)))?;
-    let start = timing.start_timestamp_ms.unwrap_or(0);
+    let start = timing.start_timestamp_ms.ok_or_else(||
+        AppError::InvalidState("timing has no start".into()))?;
     let total = pending.finish_timestamp_ms - start;
     repo.update_finish(timing.id, pending.finish_timestamp_ms, total)?;
     repo.mark_pending_assigned(pending_id)?;
@@ -187,14 +177,14 @@ mod tests_finish {
     }
 
     #[tokio::test]
-    async fn finish_unknown_bib_saves_pending() {
+    async fn finish_unknown_bib_errors() {
         let (state, repo, clock) = setup().await;
         start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
         clock.advance(3_000);
         let err = finish_by_bib(&state, &repo, &*clock, 999, "PC-A").await.unwrap_err();
         assert!(matches!(err, AppError::NotFound(_)));
         let s = state.read().await;
-        assert_eq!(s.pending.len(), 1);
+        assert_eq!(s.pending.len(), 0);
     }
 
     #[tokio::test]
@@ -248,7 +238,7 @@ mod tests_pending {
 mod tests {
     use super::*;
     use crate::db::{migrations, Db};
-    use crate::models::Athlete;
+    use crate::models::{Athlete, Course};
     use crate::state::{bootstrap_from_db, new_shared};
     use crate::timer::clock::MockClock;
     use std::sync::Arc;

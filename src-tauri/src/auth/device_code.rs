@@ -49,6 +49,7 @@ pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: Option<String>,
     pub expires_in: i64,
+    #[allow(dead_code)]
     pub token_type: String,
 }
 

@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tokio_util::sync::CancellationToken;
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn(
     app: AppHandle,
     state: SharedState,

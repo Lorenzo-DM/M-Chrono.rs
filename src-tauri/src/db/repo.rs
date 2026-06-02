@@ -39,6 +39,7 @@ pub struct Repo {
 }
 
 impl Repo {
+    #[allow(dead_code)]
     pub fn new(conn: Arc<Mutex<Connection>>) -> Self {
         Self { conn, clock: Arc::new(SystemClock) }
     }
@@ -106,6 +107,7 @@ impl Repo {
         Ok(rows.filter_map(Result::ok).collect())
     }
 
+    #[allow(dead_code)]
     pub fn list_athletes_by_course(&self, course_id: i64) -> AppResult<Vec<Athlete>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
@@ -119,6 +121,7 @@ impl Repo {
         Ok(rows.filter_map(Result::ok).collect())
     }
 
+    #[allow(dead_code)]
     pub fn insert_timing_running(&self, athlete_id: i64, course_id: i64,
                                   start_ms: i64, operator_id: &str) -> AppResult<i64> {
         let now = self.clock.now_ms();
@@ -267,6 +270,7 @@ impl Repo {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn list_pending_open(&self, course_id: i64) -> AppResult<Vec<PendingFinish>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
@@ -333,6 +337,7 @@ impl Repo {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn record_sync_error_timing(&self, local_id: i64, error: &str) -> AppResult<()> {
         self.lock().execute(
             "UPDATE timings SET sync_attempts = sync_attempts + 1, last_sync_error = ?1
