@@ -3,6 +3,7 @@
   import { api } from './lib/api';
   import { courses, config } from './lib/stores';
   import Header from './lib/components/Header.svelte';
+  import CoursePage from './lib/components/CoursePage.svelte';
 
   type View = { kind: 'home' } | { kind: 'course'; id: number } | { kind: 'settings' };
   let view = $state<View>({ kind: 'home' });
@@ -40,8 +41,14 @@
         </div>
       {/if}
     {:else if view.kind === 'course'}
-      <p>Course page placeholder for {view.id}</p>
-      <button class="btn preset-tonal" onclick={() => view = { kind: 'home' }}>← Home</button>
+      {@const courseView = view}
+      {@const c = $courses.find(x => x.id === courseView.id)}
+      {#if c}
+        <CoursePage course={c} onBack={() => view = { kind: 'home' }} />
+      {:else}
+        <p>Percorso non trovato.</p>
+        <button class="btn preset-tonal" onclick={() => view = { kind: 'home' }}>← Home</button>
+      {/if}
     {:else}
       <p>Settings page placeholder</p>
       <button class="btn preset-tonal" onclick={() => view = { kind: 'home' }}>← Home</button>
