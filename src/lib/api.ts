@@ -26,4 +26,5 @@ export const api = {
   startDeviceLogin: () => invoke<DeviceCodeResponse>('start_device_login'),
   isAuthenticated: () => invoke<boolean>('is_authenticated'),
   logout: () => invoke<void>('logout'),
+  fetchRemoteData: () => invoke<{ courses_count: number; athletes_count: number }>('fetch_remote_data'),
 };

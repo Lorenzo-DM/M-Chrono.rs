@@ -206,3 +206,30 @@ pub async fn logout(app: AppHandle, ctx: State<'_, AppCtx>) -> Result<(), AppErr
     let _ = app.emit("auth:logged_out", ());
     Ok(())
 }
+
+#[derive(Serialize)]
+pub struct FetchSummary {
+    pub courses_count: usize,
+    pub athletes_count: usize,
+}
+
+#[tauri::command]
+pub async fn fetch_remote_data(ctx: State<'_, AppCtx>) -> Result<FetchSummary, AppError> {
+    let cfg = ctx.config.read().await.clone();
+    let token = ctx.auth.get_access_token(&cfg).await?;
+    let courses = crate::api::fetch::fetch_courses(&ctx.http, &cfg.api_base_url, &token).await?;
+    let athletes = crate::api::fetch::fetch_athletes(&ctx.http, &cfg.api_base_url, &token).await?;
+    for c in &courses {
+        ctx.repo.upsert_course(c)?;
+    }
+    for a in &athletes {
+        ctx.repo.upsert_athlete(a)?;
+    }
+    // refresh in-memory state from DB
+    let snap = crate::state::bootstrap_from_db(&ctx.repo, &*ctx.clock)?;
+    *ctx.state.write().await = snap;
+    Ok(FetchSummary {
+        courses_count: courses.len(),
+        athletes_count: athletes.len(),
+    })
+}

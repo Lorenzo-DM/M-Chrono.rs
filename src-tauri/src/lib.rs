@@ -78,6 +78,7 @@ pub fn run() {
             commands::start_device_login,
             commands::is_authenticated,
             commands::logout,
+            commands::fetch_remote_data,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { api } from '../api';
-  import { config } from '../stores';
+  import { config, isAuthenticated as isAuthStore, courses } from '../stores';
   import DeviceLoginModal from './DeviceLoginModal.svelte';
-  import { isAuthenticated as isAuthStore } from '../stores';
 
   let { onBack }: { onBack: () => void } = $props();
   let operatorId = $state($config?.operator_id ?? '');
@@ -62,6 +61,22 @@
     <p class="opacity-70 mb-2">Non autenticato</p>
     <button class="btn preset-filled" onclick={() => showLogin = true}>Accedi</button>
   {/if}
+</section>
+
+<section class="max-w-md mt-6">
+  <h3 class="text-xl mb-2">Dati gara</h3>
+  <button class="btn preset-filled"
+          onclick={async () => {
+            try {
+              const s = await api.fetchRemoteData();
+              alert(`Scaricati ${s.courses_count} percorsi, ${s.athletes_count} atleti`);
+              courses.set(await api.getCourses());
+            } catch (e: any) {
+              alert(e?.message ?? String(e));
+            }
+          }}>
+    Sincronizza atleti/percorsi
+  </button>
 </section>
 
 {#if showLogin}
