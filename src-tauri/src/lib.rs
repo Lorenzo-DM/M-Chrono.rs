@@ -59,7 +59,13 @@ pub fn run() {
             app.manage(AppCtx { state, repo, clock, config, config_path, http });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_courses,
+            commands::poll_display,
+            commands::get_athletes_by_course,
+            commands::get_pending_finishes,
+            commands::get_config,
+        ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");
 }
