@@ -4,6 +4,26 @@ use crate::timer::clock::{ClockProvider, SystemClock};
 use rusqlite::{params, Connection};
 use std::sync::{Arc, Mutex};
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SyncCursor { pub last_seen_remote_id: i64, pub last_pull_at_ms: i64 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ResultRow {
+    pub timing_id: i64,
+    pub athlete_id: Option<i64>,
+    pub bib_number: Option<i64>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+    pub course_id: i64,
+    pub course_name: String,
+    pub start_timestamp_ms: Option<i64>,
+    pub finish_timestamp_ms: Option<i64>,
+    pub total_time_ms: Option<i64>,
+    pub status: String,
+    pub operator_id: String,
+    pub duplicate_flagged: bool,
+}
+
 pub struct Repo {
     pub conn: Arc<Mutex<Connection>>,
     pub clock: Arc<dyn ClockProvider>,
@@ -256,6 +276,167 @@ impl Repo {
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
     }
+
+    pub fn fetch_unsynced_timings(&self, limit: i64) -> AppResult<Vec<Timing>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id, athlete_id, course_id, start_timestamp_ms,
+                    finish_timestamp_ms, status, total_time_ms, operator_id,
+                    duplicate_group_id, duplicate_flagged, synced
+             FROM timings
+             WHERE synced = 0 AND sync_attempts < 5
+             ORDER BY id LIMIT ?1"
+        )?;
+        let rows = stmt.query_map(params![limit], Self::map_timing)?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn fetch_unsynced_pending(&self, limit: i64) -> AppResult<Vec<PendingFinish>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id, course_id, finish_timestamp_ms, operator_id, assigned, synced
+             FROM pending_finishes
+             WHERE synced = 0 AND sync_attempts < 5
+             ORDER BY id LIMIT ?1"
+        )?;
+        let rows = stmt.query_map(params![limit], |r| Ok(PendingFinish {
+            id: r.get(0)?, remote_id: r.get(1)?, course_id: r.get(2)?,
+            finish_timestamp_ms: r.get(3)?, operator_id: r.get(4)?,
+            assigned: r.get::<_, i64>(5)? != 0, synced: r.get::<_, i64>(6)? != 0,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn mark_timing_synced(&self, local_id: i64, remote_id: i64) -> AppResult<()> {
+        self.lock().execute(
+            "UPDATE timings SET synced = 1, remote_id = ?1, last_sync_error = NULL
+             WHERE id = ?2",
+            params![remote_id, local_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn mark_pending_synced(&self, local_id: i64, remote_id: i64) -> AppResult<()> {
+        self.lock().execute(
+            "UPDATE pending_finishes SET synced = 1, remote_id = ?1 WHERE id = ?2",
+            params![remote_id, local_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn record_sync_error_timing(&self, local_id: i64, error: &str) -> AppResult<()> {
+        self.lock().execute(
+            "UPDATE timings SET sync_attempts = sync_attempts + 1, last_sync_error = ?1
+             WHERE id = ?2",
+            params![error, local_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_remote_timing(&self, t: &Timing) -> AppResult<()> {
+        let now = self.clock.now_ms();
+        let remote = t.remote_id.ok_or_else(||
+            AppError::Db("upsert_remote_timing requires remote_id".into()))?;
+        self.lock().execute(
+            "INSERT INTO timings(remote_id, athlete_id, course_id, start_timestamp_ms,
+                                 finish_timestamp_ms, status, total_time_ms, operator_id,
+                                 created_at_ms, updated_at_ms, synced)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, 1)
+             ON CONFLICT(remote_id) DO UPDATE SET
+                 athlete_id = excluded.athlete_id,
+                 finish_timestamp_ms = excluded.finish_timestamp_ms,
+                 status = excluded.status,
+                 total_time_ms = excluded.total_time_ms,
+                 updated_at_ms = excluded.updated_at_ms,
+                 synced = 1",
+            params![remote, t.athlete_id, t.course_id, t.start_timestamp_ms,
+                    t.finish_timestamp_ms, t.status.as_str(), t.total_time_ms,
+                    t.operator_id, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_duplicate_group(&self, timing_ids: &[i64], group_id: &str, flagged: bool)
+        -> AppResult<()> {
+        let now = self.clock.now_ms();
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare(
+                "UPDATE timings SET duplicate_group_id = ?1, duplicate_flagged = ?2,
+                                    updated_at_ms = ?3 WHERE id = ?4"
+            )?;
+            for id in timing_ids {
+                stmt.execute(params![group_id, flagged as i64, now, id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_finished_timings_for_athlete(&self, athlete_id: i64) -> AppResult<Vec<Timing>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, remote_id, athlete_id, course_id, start_timestamp_ms,
+                    finish_timestamp_ms, status, total_time_ms, operator_id,
+                    duplicate_group_id, duplicate_flagged, synced
+             FROM timings
+             WHERE athlete_id = ?1 AND status = 'Finished'
+             ORDER BY finish_timestamp_ms"
+        )?;
+        let rows = stmt.query_map(params![athlete_id], Self::map_timing)?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn get_sync_cursor(&self, resource: &str) -> AppResult<SyncCursor> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT last_seen_remote_id, last_pull_at_ms FROM sync_cursor WHERE resource = ?1"
+        )?;
+        let mut rows = stmt.query(params![resource])?;
+        if let Some(row) = rows.next()? {
+            Ok(SyncCursor { last_seen_remote_id: row.get(0)?, last_pull_at_ms: row.get(1)? })
+        } else {
+            Ok(SyncCursor { last_seen_remote_id: 0, last_pull_at_ms: 0 })
+        }
+    }
+
+    pub fn update_sync_cursor(&self, resource: &str, last_id: i64, now_ms: i64) -> AppResult<()> {
+        self.lock().execute(
+            "INSERT INTO sync_cursor(resource, last_seen_remote_id, last_pull_at_ms)
+             VALUES(?1, ?2, ?3)
+             ON CONFLICT(resource) DO UPDATE SET
+                 last_seen_remote_id = excluded.last_seen_remote_id,
+                 last_pull_at_ms = excluded.last_pull_at_ms",
+            params![resource, last_id, now_ms],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_results_by_course(&self, course_id: i64) -> AppResult<Vec<ResultRow>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT t.id, t.athlete_id, a.bib_number, a.first_name, a.last_name,
+                    t.course_id, c.name,
+                    t.start_timestamp_ms, t.finish_timestamp_ms, t.total_time_ms,
+                    t.status, t.operator_id, t.duplicate_flagged
+             FROM timings t
+             LEFT JOIN athletes a ON a.id = t.athlete_id
+             JOIN courses c ON c.id = t.course_id
+             WHERE t.course_id = ?1
+             ORDER BY CASE WHEN t.total_time_ms IS NULL THEN 1 ELSE 0 END,
+                      t.total_time_ms ASC"
+        )?;
+        let rows = stmt.query_map(params![course_id], |r| Ok(ResultRow {
+            timing_id: r.get(0)?, athlete_id: r.get(1)?, bib_number: r.get(2)?,
+            first_name: r.get(3)?, last_name: r.get(4)?,
+            course_id: r.get(5)?, course_name: r.get(6)?,
+            start_timestamp_ms: r.get(7)?, finish_timestamp_ms: r.get(8)?,
+            total_time_ms: r.get(9)?, status: r.get(10)?, operator_id: r.get(11)?,
+            duplicate_flagged: r.get::<_, i64>(12)? != 0,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
 }
 
 #[cfg(test)]
@@ -335,6 +516,30 @@ mod tests {
         let t = r.find_running_timing_for_athlete(1, "PC-A").unwrap().unwrap();
         assert_eq!(t.athlete_id, Some(1));
         assert!(r.find_running_timing_for_athlete(1, "PC-B").unwrap().is_none());
+    }
+
+    #[test]
+    fn unsynced_query_excludes_synced_rows() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
+                                     last_name: "b".into(), course_id: 1 }).unwrap();
+        let t1 = r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
+        r.update_finish(t1, 200, 100).unwrap();
+        assert_eq!(r.fetch_unsynced_timings(10).unwrap().len(), 1);
+        r.mark_timing_synced(t1, 999).unwrap();
+        assert_eq!(r.fetch_unsynced_timings(10).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn sync_cursor_default_zero_and_update() {
+        let r = fresh();
+        let c = r.get_sync_cursor("timings").unwrap();
+        assert_eq!(c.last_seen_remote_id, 0);
+        r.update_sync_cursor("timings", 42, 1000).unwrap();
+        let c2 = r.get_sync_cursor("timings").unwrap();
+        assert_eq!(c2.last_seen_remote_id, 42);
     }
 
     #[test]
