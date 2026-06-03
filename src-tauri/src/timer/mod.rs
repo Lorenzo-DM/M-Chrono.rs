@@ -106,6 +106,27 @@ pub async fn capture_pending_finish(
     Ok(p)
 }
 
+pub async fn capture_pending_tie(
+    state: &SharedState,
+    repo: &Repo,
+    course_id: i64,
+    operator_id: &str,
+) -> AppResult<PendingFinish> {
+    let reference_ts = {
+        let s = state.read().await;
+        s.pending.iter()
+            .filter(|p| p.course_id == course_id && !p.assigned)
+            .map(|p| p.finish_timestamp_ms)
+            .max()
+            .ok_or_else(|| AppError::InvalidState(
+                "nessun arrivo recente da agganciare per il tie".into()
+            ))?
+    };
+    let p = repo.insert_pending_finish(course_id, reference_ts, operator_id)?;
+    state.write().await.pending.push(p.clone());
+    Ok(p)
+}
+
 pub async fn assign_pending(
     state: &SharedState,
     repo: &Repo,

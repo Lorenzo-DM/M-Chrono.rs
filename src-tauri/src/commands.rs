@@ -149,6 +149,15 @@ pub async fn capture_pending_finish(app: AppHandle, ctx: State<'_, AppCtx>, cour
 }
 
 #[tauri::command]
+pub async fn capture_pending_tie(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64)
+    -> Result<PendingFinish, AppError> {
+    let op = current_operator(&ctx).await?;
+    let p = crate::timer::capture_pending_tie(&ctx.state, &ctx.repo, course_id, &op).await?;
+    let _ = app.emit("pending:captured", &p);
+    Ok(p)
+}
+
+#[tauri::command]
 pub async fn assign_pending(app: AppHandle, ctx: State<'_, AppCtx>, pending_id: i64, bib: i64)
     -> Result<Timing, AppError> {
     let op = current_operator(&ctx).await?;

@@ -103,6 +103,19 @@
     }
   }
 
+  async function doTie() {
+    if (pending.length === 0) return;
+    error = null;
+    try {
+      const p = await api.capturePendingTie(course.id);
+      pending = [p, ...pending];
+      flashing = true;
+      setTimeout(() => (flashing = false), 600);
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
   async function doAssign(pid: number) {
     error = null;
     const raw = (bibInputs[pid] ?? '').trim();
@@ -282,20 +295,34 @@
         ■ GARA TERMINATA
       </button>
     {:else}
-      <button
-        class="btn-base btn-accent-tap w-full text-base font-semibold"
-        style="padding: 1rem 1rem; letter-spacing: 0.06em"
-        onclick={doRecord}
-      >
-        RECORD TIME
-        {#if active}
-          <span
-            class="kbd ml-2"
-            style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
-            >␣</span
-          >
-        {/if}
-      </button>
+      <div class="flex gap-2">
+        <button
+          class="btn-base btn-accent-tap flex-1 text-base font-semibold"
+          style="padding: 1rem 1rem; letter-spacing: 0.06em"
+          onclick={doRecord}
+        >
+          RECORD TIME
+          {#if active}
+            <span
+              class="kbd ml-2"
+              style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
+              >␣</span
+            >
+          {/if}
+        </button>
+        <button
+          class="btn-tie"
+          title={pending.length > 0
+            ? `Aggiunge un atleta con lo stesso tempo dell'ultimo arrivo (${formatMsToHms(pending[0].finish_timestamp_ms % 86_400_000)})`
+            : 'Disponibile dopo il primo RECORD'}
+          aria-label="Cattura tempo identico"
+          disabled={pending.length === 0}
+          onclick={doTie}
+        >
+          <span class="num text-base font-bold">+1</span>
+          <span class="tie-label">STESSO TEMPO</span>
+        </button>
+      </div>
     {/if}
   </div>
 
@@ -549,5 +576,42 @@
   .btn-header-end:active,
   .btn-header-restart:active {
     transform: translateY(1px);
+  }
+  .btn-tie {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--accent-pending);
+    background: transparent;
+    color: var(--accent-pending);
+    cursor: pointer;
+    line-height: 1;
+    transition:
+      background 120ms ease,
+      color 120ms ease,
+      transform 80ms ease,
+      border-style 120ms ease;
+  }
+  .btn-tie:hover:not(:disabled) {
+    background: var(--accent-pending);
+    color: #fbf8ed;
+    border-style: solid;
+  }
+  .btn-tie:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn-tie:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .tie-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
 </style>

@@ -22,6 +22,8 @@ export const api = {
     invoke<Timing>('finish_by_athlete_id', { athleteId }),
   capturePending: (courseId: number) =>
     invoke<PendingFinish>('capture_pending_finish', { courseId }),
+  capturePendingTie: (courseId: number) =>
+    invoke<PendingFinish>('capture_pending_tie', { courseId }),
   assignPending: (pendingId: number, bib: number) =>
     invoke<Timing>('assign_pending', { pendingId, bib }),
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),

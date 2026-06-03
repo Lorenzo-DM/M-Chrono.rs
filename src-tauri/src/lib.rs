@@ -107,6 +107,7 @@ pub fn run() {
             commands::finish_by_bib,
             commands::finish_by_athlete_id,
             commands::capture_pending_finish,
+            commands::capture_pending_tie,
             commands::assign_pending,
             commands::withdraw_athlete,
             commands::undo_finish,
