@@ -183,6 +183,15 @@ pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> R
 }
 
 #[tauri::command]
+pub async fn reassign_bib(app: AppHandle, ctx: State<'_, AppCtx>, timing_id: i64, new_bib: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::reassign_bib(&ctx.state, &ctx.repo, timing_id, new_bib, &op).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+#[tauri::command]
 pub async fn end_course(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64, confirm_name: String)
     -> Result<i64, AppError> {
     let expected = {

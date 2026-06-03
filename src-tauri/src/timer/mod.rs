@@ -219,6 +219,52 @@ pub async fn restart_course(
     Ok(())
 }
 
+pub async fn reassign_bib(
+    state: &SharedState,
+    repo: &Repo,
+    timing_id: i64,
+    new_bib: i64,
+    operator_id: &str,
+) -> AppResult<Timing> {
+    let mut s = state.write().await;
+
+    let old = s.timings.get(&timing_id).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("timing {}", timing_id)))?;
+    if !matches!(old.status, TimingStatus::Finished) {
+        return Err(AppError::InvalidState("timing non è in stato Finished".into()));
+    }
+    let finish_ts = old.finish_timestamp_ms
+        .ok_or_else(|| AppError::InvalidState("timing privo di finish".into()))?;
+
+    let new_athlete = s.athletes_by_bib.get(&new_bib).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("pettorale {} non trovato", new_bib)))?;
+    if Some(new_athlete.id) == old.athlete_id {
+        return Err(AppError::InvalidState("pettorale identico, nessuna modifica".into()));
+    }
+    if new_athlete.course_id != old.course_id {
+        return Err(AppError::InvalidState(
+            format!("pettorale {} non appartiene a questo percorso", new_bib)
+        ));
+    }
+
+    let target = repo.find_running_timing_for_athlete(new_athlete.id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState(
+            format!("pettorale {} non ha un timing in corso", new_bib)
+        ))?;
+    let start = target.start_timestamp_ms
+        .ok_or_else(|| AppError::InvalidState("nuovo timing privo di start".into()))?;
+    let total = finish_ts - start;
+
+    repo.undo_finish(timing_id)?;
+    repo.update_finish(target.id, finish_ts, total)?;
+
+    let reverted = repo.get_timing(timing_id)?.expect("reverted");
+    let updated = repo.get_timing(target.id)?.expect("updated");
+    s.timings.insert(reverted.id, reverted);
+    s.timings.insert(updated.id, updated.clone());
+    Ok(updated)
+}
+
 pub async fn end_course(
     state: &SharedState,
     repo: &Repo,

@@ -29,6 +29,8 @@
   let bibInputs = $state<Record<number, string>>({});
   let showEndModal = $state(false);
   let showRestartModal = $state(false);
+  let editingTimingId = $state<number | null>(null);
+  let editBibInput = $state('');
 
   $effect(() => {
     let alive = true;
@@ -161,6 +163,34 @@
     }
   }
 
+  function startEditBib(timingId: number, currentBib: number) {
+    editingTimingId = timingId;
+    editBibInput = String(currentBib);
+    error = null;
+  }
+
+  function cancelEditBib() {
+    editingTimingId = null;
+    editBibInput = '';
+  }
+
+  async function commitEditBib(timingId: number) {
+    const n = parseInt(editBibInput.trim());
+    if (!Number.isFinite(n) || n <= 0) {
+      error = 'pettorale non valido';
+      return;
+    }
+    error = null;
+    try {
+      await api.reassignBib(timingId, n);
+      editingTimingId = null;
+      editBibInput = '';
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
   function handleKey(e: KeyboardEvent) {
     if (!active) return;
     const tgt = e.target as HTMLElement | null;
@@ -173,15 +203,21 @@
   }
 
   type Row =
-    | { kind: 'pending'; p: PendingFinish; t: number }
-    | { kind: 'finish'; f: AthleteRow; t: number };
+    | { kind: 'pending'; p: PendingFinish; t: number; pos: number }
+    | { kind: 'finish'; f: AthleteRow; t: number; pos: number };
 
-  let rows = $derived<Row[]>(
-    [
-      ...pending.map<Row>((p) => ({ kind: 'pending', p, t: p.finish_timestamp_ms })),
-      ...finishers.map<Row>((f) => ({ kind: 'finish', f, t: f.finish_ms ?? 0 })),
-    ].sort((a, b) => b.t - a.t),
-  );
+  let rows = $derived.by<Row[]>(() => {
+    const merged: Array<
+      | { kind: 'pending'; p: PendingFinish; t: number }
+      | { kind: 'finish'; f: AthleteRow; t: number }
+    > = [
+      ...pending.map((p) => ({ kind: 'pending' as const, p, t: p.finish_timestamp_ms })),
+      ...finishers.map((f) => ({ kind: 'finish' as const, f, t: f.finish_ms ?? 0 })),
+    ];
+    const asc = [...merged].sort((a, b) => a.t - b.t);
+    const positioned: Row[] = asc.map((r, i) => ({ ...r, pos: i + 1 }));
+    return positioned.sort((a, b) => b.t - a.t);
+  });
 
   let pendingCount = $derived(pending.length);
 </script>
@@ -358,15 +394,13 @@
       <ul class="flex-1 overflow-auto">
         {#each rows as r (r.kind === 'pending' ? `p-${r.p.id}` : `f-${r.f.athlete.id}`)}
           {#if r.kind === 'pending'}
-            <li
-              class="row row-pending slide-in"
-              style="border-color: var(--line-1)"
-            >
-              <div class="num text-base" style="color: var(--fg-0); font-weight: 600">
+            <li class="row row-pending slide-in">
+              <span class="pos-chip">{r.pos}</span>
+              <span class="row-time num">
                 {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
-              </div>
+              </span>
               <form
-                class="flex items-center gap-2 ml-auto"
+                class="row-main"
                 onsubmit={(e) => {
                   e.preventDefault();
                   doAssign(r.p.id);
@@ -384,17 +418,18 @@
                       [r.p.id]: (e.currentTarget as HTMLInputElement).value,
                     })}
                 />
+                <span class="row-hint">da assegnare</span>
                 <button
                   type="submit"
-                  class="btn-base btn-primary"
-                  style="padding: 0.4rem 0.7rem; font-size: 0.85rem"
-                  title="Assegna"
+                  class="btn-row btn-row-confirm"
+                  title="Assegna pettorale"
+                  aria-label="Assegna pettorale"
                 >
                   ✓
                 </button>
                 <button
                   type="button"
-                  class="btn-icon-del"
+                  class="btn-row btn-row-danger"
                   title="Elimina tempo"
                   aria-label="Elimina tempo"
                   onclick={(e) => {
@@ -407,32 +442,83 @@
               </form>
             </li>
           {:else}
-            <li class="row row-finish" style="border-color: var(--line-1)">
-              <div class="num" style="color: var(--accent-running); font-weight: 700; min-width: 3rem">
-                #{r.f.athlete.bib_number}
-              </div>
-              <div
-                class="flex-1 min-w-0 truncate"
-                style="color: var(--fg-1); font-weight: 500"
-              >
-                {r.f.athlete.first_name} {r.f.athlete.last_name}
-              </div>
-              <div class="num text-sm" style="color: var(--fg-0); font-weight: 600">
+            {@const isEditing = editingTimingId === r.f.timing_id && r.f.timing_id != null}
+            <li class="row row-finish">
+              <span class="pos-chip pos-chip-done">{r.pos}</span>
+              <span class="row-time num">
                 {formatMsToHms(r.f.total_ms ?? 0)}
-              </div>
-              {#if r.f.timing_id != null}
-                <button
-                  type="button"
-                  class="btn-icon-del"
-                  title="Annulla arrivo (errore)"
-                  aria-label="Annulla arrivo"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
+              </span>
+              {#if isEditing}
+                <form
+                  class="row-main"
+                  onsubmit={(e) => {
+                    e.preventDefault();
+                    if (r.f.timing_id != null) commitEditBib(r.f.timing_id);
                   }}
                 >
-                  ✕
-                </button>
+                  <input
+                    type="number"
+                    inputmode="numeric"
+                    class="bib-input num"
+                    bind:value={editBibInput}
+                    placeholder="BIB"
+                    autocomplete="off"
+                  />
+                  <span class="row-hint">nuovo pettorale</span>
+                  <button
+                    type="submit"
+                    class="btn-row btn-row-confirm"
+                    title="Salva"
+                    aria-label="Salva"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-row"
+                    title="Annulla modifica"
+                    aria-label="Annulla modifica"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      cancelEditBib();
+                    }}
+                  >
+                    ⌫
+                  </button>
+                </form>
+              {:else}
+                <div class="row-main">
+                  <span class="row-bib num">#{r.f.athlete.bib_number}</span>
+                  <span class="row-name truncate">
+                    {r.f.athlete.first_name} {r.f.athlete.last_name}
+                  </span>
+                  {#if r.f.timing_id != null}
+                    <button
+                      type="button"
+                      class="btn-row"
+                      title="Modifica pettorale"
+                      aria-label="Modifica pettorale"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        startEditBib(r.f.timing_id!, r.f.athlete.bib_number);
+                      }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      class="btn-row btn-row-danger"
+                      title="Annulla arrivo"
+                      aria-label="Annulla arrivo"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  {/if}
+                </div>
               {/if}
             </li>
           {/if}
@@ -487,39 +573,97 @@
     overflow: hidden;
   }
   .row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 2.25rem 5.5rem 1fr;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.55rem 0.75rem;
-    border-bottom: 1px solid;
+    gap: 0.6rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--line-1);
     font-size: 0.9rem;
+    transition: background 100ms;
   }
   .row:last-child {
     border-bottom: none;
   }
   .row-pending {
-    background: rgba(160, 112, 29, 0.07);
+    background: rgba(192, 138, 42, 0.08);
     border-left: 3px solid var(--accent-pending);
+    padding-left: calc(0.75rem - 3px);
   }
   .row-pending:hover {
-    background: rgba(160, 112, 29, 0.12);
+    background: rgba(192, 138, 42, 0.14);
+  }
+  .row-finish {
+    border-left: 3px solid transparent;
+    padding-left: calc(0.75rem - 3px);
   }
   .row-finish:hover {
     background: var(--bg-2);
   }
-  .bib-input {
-    width: 5rem;
-    text-align: center;
-    padding: 0.35rem 0.4rem;
-    font-size: 0.95rem;
-    font-weight: 600;
+  .pos-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    padding: 0.18rem 0.4rem;
+    border-radius: var(--radius-pill);
+    background: var(--bg-3);
+    color: var(--fg-1);
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
   }
-  .btn-icon-del {
+  .pos-chip-done {
+    background: var(--accent-running);
+    color: #f6f2e9;
+  }
+  .row-time {
+    color: var(--fg-0);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+  }
+  .row-main {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  .row-bib {
+    color: var(--accent-running);
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .row-name {
+    color: var(--fg-1);
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+  }
+  .row-hint {
+    color: var(--fg-3);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    flex: 1;
+  }
+  .bib-input {
+    width: 4.5rem;
+    text-align: center;
+    padding: 0.3rem 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .btn-row {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 1.85rem;
     height: 1.85rem;
+    flex-shrink: 0;
     border-radius: var(--radius-md);
     border: 1px solid transparent;
     background: transparent;
@@ -532,12 +676,26 @@
       color 120ms ease,
       border-color 120ms ease;
   }
-  .btn-icon-del:hover {
+  .btn-row:hover {
+    background: var(--bg-3);
+    color: var(--fg-0);
+    border-color: var(--line-2);
+  }
+  .btn-row-confirm {
+    color: var(--accent-start);
+    border-color: rgba(74, 140, 79, 0.35);
+  }
+  .btn-row-confirm:hover {
+    background: var(--accent-start);
+    color: #f6f2e9;
+    border-color: var(--accent-start);
+  }
+  .btn-row-danger:hover {
     background: rgba(184, 85, 58, 0.12);
     color: var(--accent-finish);
     border-color: rgba(184, 85, 58, 0.35);
   }
-  .btn-icon-del:active {
+  .btn-row-danger:active {
     background: rgba(184, 85, 58, 0.2);
   }
   .btn-header-end,

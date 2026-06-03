@@ -28,6 +28,8 @@ export const api = {
     invoke<Timing>('assign_pending', { pendingId, bib }),
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),
   undoFinish: (timingId: number) => invoke<void>('undo_finish', { timingId }),
+  reassignBib: (timingId: number, newBib: number) =>
+    invoke<Timing>('reassign_bib', { timingId, newBib }),
   deletePendingFinish: (pendingId: number) =>
     invoke<void>('delete_pending_finish', { pendingId }),
   updateOperatorId: (id: string) => invoke<void>('update_operator_id', { id }),

@@ -112,6 +112,7 @@ pub fn run() {
             commands::withdraw_athlete,
             commands::undo_finish,
             commands::delete_pending_finish,
+            commands::reassign_bib,
             commands::end_course,
             commands::restart_course,
             commands::update_operator_id,
