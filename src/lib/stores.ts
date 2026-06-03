@@ -2,6 +2,7 @@ import { writable } from 'svelte/store';
 import type { Course, SyncStatus, AppConfig } from './types';
 
 export type LayoutMode = 'tabs' | 'split' | 'grid';
+export type NavView = 'timing' | 'results' | 'settings' | 'export';
 
 export const courses = writable<Course[]>([]);
 export const syncStatus = writable<SyncStatus>({

@@ -1,20 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from './lib/api';
-  import { courses, config, activeCourseId, recentFinishes, isAuthenticated } from './lib/stores';
-  import { on } from './lib/events';
+  import { courses, config, activeCourseId, isAuthenticated, type NavView } from './lib/stores';
   import Header from './lib/components/Header.svelte';
   import Workspace from './lib/components/Workspace.svelte';
-  import PendingDock from './lib/components/PendingDock.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
   import IntroFlow from './lib/components/IntroFlow.svelte';
 
-  type View = 'workspace' | 'settings' | 'intro';
-  let view = $state<View>('workspace');
+  type View = NavView | 'intro';
+  let view = $state<View>('timing');
   let booted = $state(false);
   let showDup = $state(false);
-  let dockCollapsed = $state(false);
 
   function needsIntro(): boolean {
     const cfg = $config;
@@ -25,37 +22,25 @@
   }
 
   onMount(() => {
-    let unsubFinish: (() => void) | null = null;
-
     (async () => {
       const [c, cfg, authed] = await Promise.all([
-        api.getCourses(), api.getConfig(), api.isAuthenticated(),
+        api.getCourses(),
+        api.getConfig(),
+        api.isAuthenticated(),
       ]);
       courses.set(c);
       config.set(cfg);
       isAuthenticated.set(authed);
       if (c.length > 0) activeCourseId.set(c[0].id);
-      view = needsIntro() ? 'intro' : 'workspace';
+      view = needsIntro() ? 'intro' : 'timing';
       booted = true;
-
-      unsubFinish = await on('athlete:finished', (t: any) => {
-        if (!t) return;
-        recentFinishes.update(arr => [{
-          timing_id: t.id,
-          course_id: t.course_id,
-          bib_number: null,
-          total_ms: t.total_time_ms,
-          operator_id: t.operator_id,
-          at_ms: Date.now(),
-        }, ...arr].slice(0, 30));
-      });
     })();
 
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const inInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
       if (inInput) return;
-      if (view !== 'workspace') return;
+      if (view !== 'timing') return;
       if (e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key) - 1;
         const list = $courses;
@@ -69,27 +54,34 @@
 
     return () => {
       window.removeEventListener('keydown', onKey);
-      unsubFinish?.();
     };
   });
 
   async function onIntroReady() {
-    // refresh state after intro completes
     const [c, cfg, authed] = await Promise.all([
-      api.getCourses(), api.getConfig(), api.isAuthenticated(),
+      api.getCourses(),
+      api.getConfig(),
+      api.isAuthenticated(),
     ]);
     courses.set(c);
     config.set(cfg);
     isAuthenticated.set(authed);
     if (c.length > 0) activeCourseId.set(c[0].id);
-    view = 'workspace';
+    view = 'timing';
+  }
+
+  function nav(v: NavView) {
+    view = v;
   }
 </script>
 
 {#if !booted}
   <main class="min-h-screen flex items-center justify-center">
     <div class="text-center">
-      <div class="text-2xl font-semibold" style="color: var(--fg-0); letter-spacing: -0.01em">
+      <div
+        class="text-2xl font-semibold"
+        style="color: var(--fg-0); letter-spacing: -0.01em"
+      >
         TrailTrace<span style="color: var(--accent-running)">·</span>Chrono
       </div>
       <div class="hud mt-2" style="color: var(--fg-3)">CARICAMENTO…</div>
@@ -97,39 +89,45 @@
   </main>
 {:else if view === 'intro'}
   <IntroFlow onReady={onIntroReady} />
-{:else if view === 'settings'}
-  <Header
-    onSettings={() => view = 'workspace'}
-    onDuplicates={() => showDup = true}
-  />
-  <SettingsPage onBack={() => view = 'workspace'} />
 {:else}
   <div class="h-screen flex flex-col">
-    <Header
-      onSettings={() => view = 'settings'}
-      onDuplicates={() => showDup = true}
-    />
-    <div class="flex-1 flex min-h-0">
-      <div class="flex-1 min-w-0">
+    <Header current={view} onNav={nav} onDuplicates={() => (showDup = true)} />
+
+    <main class="flex-1 min-h-0 overflow-hidden">
+      {#if view === 'timing'}
         <Workspace />
-      </div>
-      {#if !dockCollapsed}
-        <div style="width: 340px; min-width: 340px;">
-          <PendingDock />
+      {:else if view === 'settings'}
+        <SettingsPage onBack={() => (view = 'timing')} />
+      {:else if view === 'results'}
+        <div class="h-full flex items-center justify-center p-8">
+          <div class="panel max-w-md w-full text-center" style="padding: 2rem 2rem">
+            <div class="hud-strong mb-2" style="color: var(--fg-0)">RESULTS</div>
+            <div class="hud mb-4" style="color: var(--accent-pending)">PROSSIMAMENTE</div>
+            <div class="text-sm" style="color: var(--fg-2)">
+              Classifica globale e per percorso, filtri per categoria, ordinamento e
+              ricerca. Per ora consulta la coda di arrivi sotto ciascun timer.
+            </div>
+            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
+          </div>
+        </div>
+      {:else if view === 'export'}
+        <div class="h-full flex items-center justify-center p-8">
+          <div class="panel max-w-md w-full text-center" style="padding: 2rem 2rem">
+            <div class="hud-strong mb-2" style="color: var(--fg-0)">EXPORT</div>
+            <div class="hud mb-4" style="color: var(--accent-pending)">PROSSIMAMENTE</div>
+            <div class="text-sm" style="color: var(--fg-2)">
+              Esportazione XLSX dei risultati per percorso. Disponibile a breve. Nel
+              frattempo i tempi catturati vengono salvati localmente e sincronizzati
+              con il cloud.
+            </div>
+            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
+          </div>
         </div>
       {/if}
-      <button
-        class="px-2 py-3 border-l text-xs font-medium"
-        style="background: var(--bg-2); border-color: var(--line-2); color: var(--fg-2); writing-mode: vertical-rl; letter-spacing: 0.1em;"
-        onclick={() => dockCollapsed = !dockCollapsed}
-        title={dockCollapsed ? 'Espandi coda' : 'Riduci coda'}
-      >
-        {dockCollapsed ? '◀ CODA' : 'CODA ▶'}
-      </button>
-    </div>
+    </main>
   </div>
 {/if}
 
 {#if showDup}
-  <DuplicateReviewModal onClose={() => showDup = false} />
+  <DuplicateReviewModal onClose={() => (showDup = false)} />
 {/if}

@@ -44,7 +44,6 @@
 }
 
 * {
-    font-family: "IBM Plex Sans Variable", system-ui, sans-serif;
     font-feature-settings:
         "ss03" 1,
         "ss04" 1;
