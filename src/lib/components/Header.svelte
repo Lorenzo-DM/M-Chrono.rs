@@ -36,7 +36,7 @@
   }
 </script>
 
-<header class="panel-2 border-b" style="border-color: var(--line-2)">
+<header class="border-b" style="background: var(--bg-1); border-color: var(--line-2); box-shadow: var(--shadow-sm)">
   <div class="flex items-center gap-6 px-5 py-3">
     <!-- Brand -->
     <div class="flex items-center gap-3 shrink-0">

@@ -155,8 +155,8 @@
 >
   <!-- Course header -->
   <header
-    class="panel-2 px-4 py-3 border-b flex items-center justify-between shrink-0"
-    style="border-color: var(--line-2)"
+    class="px-4 py-3 border-b flex items-center justify-between shrink-0"
+    style="background: var(--bg-2); border-color: var(--line-2)"
   >
     <div class="flex flex-col">
       <div class="hud-strong text-base" style="color: var(--fg-0)">{course.name}</div>
