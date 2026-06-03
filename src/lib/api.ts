@@ -15,6 +15,8 @@ export const api = {
   startCourse: (courseId: number) => invoke<number>('start_course', { courseId }),
   endCourse: (courseId: number, confirmName: string) =>
     invoke<number>('end_course', { courseId, confirmName }),
+  restartCourse: (courseId: number, confirmName: string) =>
+    invoke<void>('restart_course', { courseId, confirmName }),
   finishByBib: (bib: number) => invoke<Timing>('finish_by_bib', { bib }),
   finishByAthleteId: (athleteId: number) =>
     invoke<Timing>('finish_by_athlete_id', { athleteId }),

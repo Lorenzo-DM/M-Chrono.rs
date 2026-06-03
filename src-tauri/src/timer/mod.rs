@@ -172,6 +172,32 @@ pub async fn delete_pending_finish(
     Ok(())
 }
 
+pub async fn restart_course(
+    state: &SharedState,
+    repo: &Repo,
+    course_id: i64,
+) -> AppResult<()> {
+    let mut s = state.write().await;
+    if !s.courses.contains_key(&course_id) {
+        return Err(AppError::NotFound(format!("course {}", course_id)));
+    }
+    repo.restart_course(course_id)?;
+    if let Some(c) = s.courses.get_mut(&course_id) {
+        c.started_at_ms = None;
+        c.ended_at_ms = None;
+    }
+    s.course_clock_origin.remove(&course_id);
+    let to_remove: Vec<i64> = s.timings.values()
+        .filter(|t| t.course_id == course_id)
+        .map(|t| t.id).collect();
+    for id in &to_remove { s.timings.remove(id); }
+    for v in s.timings_by_athlete.values_mut() {
+        v.retain(|id| !to_remove.contains(id));
+    }
+    s.pending.retain(|p| p.course_id != course_id);
+    Ok(())
+}
+
 pub async fn end_course(
     state: &SharedState,
     repo: &Repo,

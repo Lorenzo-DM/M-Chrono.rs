@@ -196,6 +196,27 @@ pub async fn end_course(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64, 
 }
 
 #[tauri::command]
+pub async fn restart_course(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64, confirm_name: String)
+    -> Result<(), AppError> {
+    let expected = {
+        let s = ctx.state.read().await;
+        s.courses.get(&course_id)
+            .ok_or_else(|| AppError::NotFound(format!("course {}", course_id)))?
+            .name.clone()
+    };
+    if confirm_name.trim() != expected {
+        return Err(AppError::InvalidState(
+            "nome del percorso non corrisponde".into()
+        ));
+    }
+    crate::timer::restart_course(&ctx.state, &ctx.repo, course_id).await?;
+    let _ = app.emit("course:reset", serde_json::json!({
+        "course_id": course_id,
+    }));
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn update_operator_id(ctx: State<'_, AppCtx>, id: String) -> Result<(), AppError> {
     let mut cfg = ctx.config.write().await;
     cfg.operator_id = id;

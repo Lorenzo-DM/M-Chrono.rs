@@ -4,7 +4,7 @@
   import { on } from '../events';
   import { formatMsToHms } from '../format';
   import type { Course, PendingFinish, AthleteRow } from '../types';
-  import EndRaceModal from './EndRaceModal.svelte';
+  import ConfirmRaceModal from './ConfirmRaceModal.svelte';
 
   let {
     course,
@@ -28,6 +28,7 @@
   let error = $state<string | null>(null);
   let bibInputs = $state<Record<number, string>>({});
   let showEndModal = $state(false);
+  let showRestartModal = $state(false);
 
   $effect(() => {
     let alive = true;
@@ -185,18 +186,21 @@
 >
   <!-- Course header -->
   <header
-    class="px-4 py-3 border-b flex items-center justify-between shrink-0"
+    class="px-4 py-3 border-b flex items-center justify-between gap-3 shrink-0"
     style="background: var(--bg-2); border-color: var(--line-2)"
   >
-    <div class="flex flex-col">
-      <div class="hud-strong text-base" style="color: var(--fg-0)">{course.name}</div>
+    <div class="flex flex-col min-w-0">
+      <div class="hud-strong text-base truncate" style="color: var(--fg-0)">
+        {course.name}
+      </div>
       {#if course.distance_m}
         <div class="hud mt-0.5" style="color: var(--fg-2)">
           {(course.distance_m / 1000).toFixed(1)} KM
         </div>
       {/if}
     </div>
-    <div class="flex items-center gap-2">
+
+    <div class="flex items-center gap-2 shrink-0">
       <span
         class={ended ? 'dot-idle' : started ? 'dot-running' : 'dot-idle'}
         style={ended ? 'background: var(--accent-finish)' : ''}
@@ -211,6 +215,34 @@
       >
         {ended ? 'TERMINATA' : started ? 'ACTIVE' : 'STANDBY'}
       </span>
+
+      {#if started && !ended}
+        <button
+          class="btn-header-end"
+          title="Termina gara"
+          aria-label="Termina gara"
+          onclick={(e) => {
+            e.stopPropagation();
+            showEndModal = true;
+          }}
+        >
+          ■ TERMINA
+        </button>
+      {/if}
+
+      {#if ended}
+        <button
+          class="btn-header-restart"
+          title="Riavvia gara (azzera timer)"
+          aria-label="Riavvia gara"
+          onclick={(e) => {
+            e.stopPropagation();
+            showRestartModal = true;
+          }}
+        >
+          ↻ RIAVVIA
+        </button>
+      {/if}
     </div>
   </header>
 
@@ -250,30 +282,20 @@
         ■ GARA TERMINATA
       </button>
     {:else}
-      <div class="flex gap-2">
-        <button
-          class="btn-base btn-accent-tap flex-1 text-base font-semibold"
-          style="padding: 1rem 1rem; letter-spacing: 0.06em"
-          onclick={doRecord}
-        >
-          RECORD TIME
-          {#if active}
-            <span
-              class="kbd ml-2"
-              style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
-              >␣</span
-            >
-          {/if}
-        </button>
-        <button
-          class="btn-end-race"
-          title="Termina gara"
-          aria-label="Termina gara"
-          onclick={() => (showEndModal = true)}
-        >
-          ■
-        </button>
-      </div>
+      <button
+        class="btn-base btn-accent-tap w-full text-base font-semibold"
+        style="padding: 1rem 1rem; letter-spacing: 0.06em"
+        onclick={doRecord}
+      >
+        RECORD TIME
+        {#if active}
+          <span
+            class="kbd ml-2"
+            style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
+            >␣</span
+          >
+        {/if}
+      </button>
     {/if}
   </div>
 
@@ -403,12 +425,32 @@
 </section>
 
 {#if showEndModal}
-  <EndRaceModal
+  <ConfirmRaceModal
     {course}
+    variant="end"
     onClose={() => (showEndModal = false)}
-    onDone={() => {
+    onConfirm={async (typed) => {
+      await api.endCourse(course.id, typed);
       ended = true;
-      refresh();
+      await refresh();
+    }}
+  />
+{/if}
+
+{#if showRestartModal}
+  <ConfirmRaceModal
+    {course}
+    variant="restart"
+    onClose={() => (showRestartModal = false)}
+    onConfirm={async (typed) => {
+      await api.restartCourse(course.id, typed);
+      ended = false;
+      started = false;
+      elapsed = 0;
+      pending = [];
+      finishers = [];
+      bibInputs = {};
+      await refresh();
     }}
   />
 {/if}
@@ -471,29 +513,41 @@
   .btn-icon-del:active {
     background: rgba(184, 85, 58, 0.2);
   }
-  .btn-end-race {
+  .btn-header-end,
+  .btn-header-restart {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0 1rem;
-    border: 1px solid var(--accent-finish);
+    gap: 0.35rem;
+    padding: 0.32rem 0.65rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid currentColor;
     background: transparent;
-    color: var(--accent-finish);
-    border-radius: var(--radius-md);
     cursor: pointer;
-    font-size: 1.05rem;
+    font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     transition:
       background 120ms ease,
       color 120ms ease,
       transform 80ms ease;
   }
-  .btn-end-race:hover {
+  .btn-header-end {
+    color: var(--accent-finish);
+  }
+  .btn-header-end:hover {
     background: var(--accent-finish);
     color: #f6f2e9;
   }
-  .btn-end-race:active {
+  .btn-header-restart {
+    color: var(--accent-pending);
+  }
+  .btn-header-restart:hover {
+    background: var(--accent-pending);
+    color: #f6f2e9;
+  }
+  .btn-header-end:active,
+  .btn-header-restart:active {
     transform: translateY(1px);
   }
 </style>

@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { api } from '../api';
   import type { Course } from '../types';
+
+  type Variant = 'end' | 'restart';
 
   let {
     course,
+    variant,
     onClose,
-    onDone,
+    onConfirm,
   }: {
     course: Course;
+    variant: Variant;
     onClose: () => void;
-    onDone?: () => void;
+    onConfirm: (typed: string) => Promise<void>;
   } = $props();
 
   let typed = $state('');
@@ -18,13 +21,36 @@
 
   let matches = $derived(typed.trim() === course.name);
 
+  const COPY = {
+    end: {
+      title: '⚠ TERMINA GARA',
+      titleColor: 'var(--accent-finish)',
+      lead: 'Stai per <strong>terminare definitivamente</strong> il percorso:',
+      body:
+        'Dopo la conferma il timer si ferma e non sarà più possibile registrare nuovi arrivi su questo percorso. Operazione irreversibile.',
+      cta: 'TERMINA GARA',
+      busy: 'TERMINANDO…',
+      ctaBg: 'var(--accent-finish)',
+    },
+    restart: {
+      title: '↻ RIAVVIA GARA',
+      titleColor: 'var(--accent-pending)',
+      lead: 'Stai per <strong>azzerare il cronometro</strong> del percorso:',
+      body:
+        'Tutti i tempi registrati per questo percorso (arrivi e pending) verranno eliminati. Il timer torna a 00:00:00 e potrai dare un nuovo START. Operazione irreversibile.',
+      cta: 'RIAVVIA GARA',
+      busy: 'RIAVVIANDO…',
+      ctaBg: 'var(--accent-pending)',
+    },
+  } as const;
+  let copy = $derived(COPY[variant]);
+
   async function confirm() {
     if (!matches || busy) return;
     busy = true;
     error = null;
     try {
-      await api.endCourse(course.id, typed.trim());
-      onDone?.();
+      await onConfirm(typed.trim());
       onClose();
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -47,15 +73,15 @@
       class="px-5 py-3 flex items-center justify-between border-b"
       style="border-color: var(--line-2); background: var(--bg-2)"
     >
-      <div class="hud-strong" style="color: var(--accent-finish)">
-        ⚠ TERMINA GARA
+      <div class="hud-strong" style="color: {copy.titleColor}">
+        {copy.title}
       </div>
       <button class="btn-base btn-ghost text-xs" onclick={onClose}>ESC</button>
     </div>
 
     <div class="p-6">
       <p class="text-sm mb-1" style="color: var(--fg-1)">
-        Stai per <strong>terminare definitivamente</strong> il percorso:
+        {@html copy.lead}
       </p>
       <div
         class="my-3 px-3 py-2 rounded-md"
@@ -70,8 +96,7 @@
         </div>
       </div>
       <p class="text-sm mb-4" style="color: var(--fg-2)">
-        Dopo la conferma il timer si ferma e non sarà più possibile registrare
-        nuovi arrivi su questo percorso. Operazione irreversibile.
+        {copy.body}
       </p>
 
       <div class="hud mb-2">DIGITA IL NOME DEL PERCORSO PER CONFERMARE</div>
@@ -95,12 +120,12 @@
         <button
           class="btn-base flex-1 py-3"
           style={matches
-            ? 'background: var(--accent-finish); border-color: var(--accent-finish); color: #f6f2e9'
+            ? `background: ${copy.ctaBg}; border-color: ${copy.ctaBg}; color: #f6f2e9`
             : ''}
           disabled={!matches || busy}
           onclick={confirm}
         >
-          {busy ? 'TERMINANDO…' : 'TERMINA GARA'}
+          {busy ? copy.busy : copy.cta}
         </button>
       </div>
     </div>

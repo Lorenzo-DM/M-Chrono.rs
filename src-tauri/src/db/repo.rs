@@ -112,6 +112,31 @@ impl Repo {
         Ok(())
     }
 
+    pub fn restart_course(&self, course_id: i64) -> AppResult<()> {
+        let now = self.clock.now_ms();
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        let updated = tx.execute(
+            "UPDATE courses
+             SET started_at_ms = NULL, ended_at_ms = NULL, updated_at_ms = ?1
+             WHERE id = ?2",
+            params![now, course_id],
+        )?;
+        if updated == 0 {
+            return Err(AppError::NotFound(format!("course {}", course_id)));
+        }
+        tx.execute(
+            "DELETE FROM timings WHERE course_id = ?1",
+            params![course_id],
+        )?;
+        tx.execute(
+            "DELETE FROM pending_finishes WHERE course_id = ?1",
+            params![course_id],
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn list_athletes(&self) -> AppResult<Vec<Athlete>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
