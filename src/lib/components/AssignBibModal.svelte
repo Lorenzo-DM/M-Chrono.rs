@@ -59,7 +59,7 @@
 
       <div class="flex gap-2 mt-6">
         <button class="btn-base btn-primary flex-1 py-3" disabled={busy} onclick={assign}>
-          ASSEGNA <span class="kbd ml-2" style="background:transparent; color:#000; border-color:#000">↵</span>
+          ASSEGNA <span class="kbd ml-2" style="background:transparent; color:inherit; border-color:currentColor; opacity:0.6">↵</span>
         </button>
         <button class="btn-base flex-1 py-3" onclick={onClose}>ANNULLA</button>
       </div>
