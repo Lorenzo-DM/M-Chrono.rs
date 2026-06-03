@@ -111,6 +111,7 @@ pub fn run() {
             commands::withdraw_athlete,
             commands::undo_finish,
             commands::delete_pending_finish,
+            commands::end_course,
             commands::update_operator_id,
             commands::update_config,
             commands::start_device_login,

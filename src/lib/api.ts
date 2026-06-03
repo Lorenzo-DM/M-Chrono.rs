@@ -13,6 +13,8 @@ export const api = {
     invoke<PendingFinish[]>('get_pending_finishes', { courseId }),
   getConfig: () => invoke<AppConfig>('get_config'),
   startCourse: (courseId: number) => invoke<number>('start_course', { courseId }),
+  endCourse: (courseId: number, confirmName: string) =>
+    invoke<number>('end_course', { courseId, confirmName }),
   finishByBib: (bib: number) => invoke<Timing>('finish_by_bib', { bib }),
   finishByAthleteId: (athleteId: number) =>
     invoke<Timing>('finish_by_athlete_id', { athleteId }),

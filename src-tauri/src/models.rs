@@ -7,6 +7,8 @@ pub struct Course {
     pub distance_m: Option<i64>,
     pub started_at_ms: Option<i64>,
     pub scheduled_at_ms: Option<i64>,
+    #[serde(default)]
+    pub ended_at_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

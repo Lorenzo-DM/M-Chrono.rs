@@ -86,13 +86,30 @@ impl Repo {
     pub fn list_courses(&self) -> AppResult<Vec<Course>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms FROM courses ORDER BY id"
+            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms
+             FROM courses ORDER BY id"
         )?;
         let rows = stmt.query_map([], |r| Ok(Course {
             id: r.get(0)?, name: r.get(1)?, distance_m: r.get(2)?,
             started_at_ms: r.get(3)?, scheduled_at_ms: r.get(4)?,
+            ended_at_ms: r.get(5)?,
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    pub fn end_course(&self, course_id: i64, ended_at_ms: i64) -> AppResult<()> {
+        let n = self.lock().execute(
+            "UPDATE courses
+             SET ended_at_ms = ?1, updated_at_ms = ?1
+             WHERE id = ?2 AND started_at_ms IS NOT NULL AND ended_at_ms IS NULL",
+            params![ended_at_ms, course_id],
+        )?;
+        if n == 0 {
+            return Err(AppError::InvalidState(
+                format!("course {} is not running or already ended", course_id)
+            ));
+        }
+        Ok(())
     }
 
     pub fn list_athletes(&self) -> AppResult<Vec<Athlete>> {
@@ -559,7 +576,7 @@ mod tests {
     fn upsert_course_inserts_then_updates() {
         let r = fresh();
         let mut c = Course { id: 1, name: "21K".into(), distance_m: Some(21_000),
-                             started_at_ms: None, scheduled_at_ms: None };
+                             started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None };
         r.upsert_course(&c).unwrap();
         c.name = "21K Trail".into();
         r.upsert_course(&c).unwrap();
@@ -573,7 +590,7 @@ mod tests {
         let r = fresh();
         r.upsert_course(&Course {
             id: 1, name: "21K".into(), distance_m: None,
-            started_at_ms: None, scheduled_at_ms: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None,
         }).unwrap();
         r.upsert_athlete(&Athlete {
             id: 100, bib_number: 7, first_name: "Mario".into(),
@@ -588,7 +605,7 @@ mod tests {
     fn insert_running_and_finish_updates_total() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         let tid = r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
@@ -603,7 +620,7 @@ mod tests {
     fn pending_finish_lifecycle() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         let p = r.insert_pending_finish(1, 12345, "PC-A").unwrap();
         assert!(r.list_pending_open(1).unwrap().len() == 1);
         r.mark_pending_assigned(p.id).unwrap();
@@ -614,7 +631,7 @@ mod tests {
     fn find_running_timing_returns_correct_athlete() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
@@ -627,7 +644,7 @@ mod tests {
     fn unsynced_query_excludes_synced_rows() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         let t1 = r.insert_timing_running(1, 1, 100, "PC-A").unwrap();

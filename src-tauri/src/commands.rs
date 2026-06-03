@@ -10,6 +10,7 @@ pub struct CourseSnapshot {
     pub elapsed_ms: Option<i64>,
     pub finishers_count: i64,
     pub started: bool,
+    pub ended: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -40,8 +41,12 @@ pub async fn poll_display(ctx: State<'_, AppCtx>) -> Result<DisplaySnapshot, App
     let now_inst = ctx.clock.instant_now();
     let mut courses = Vec::new();
     for (id, course) in &s.courses {
-        let elapsed_ms = s.course_clock_origin.get(id)
-            .map(|origin| now_inst.duration_since(*origin).as_millis() as i64);
+        let elapsed_ms = match (course.started_at_ms, course.ended_at_ms) {
+            (Some(start), Some(end)) => Some((end - start).max(0)),
+            (Some(_), None) => s.course_clock_origin.get(id)
+                .map(|origin| now_inst.duration_since(*origin).as_millis() as i64),
+            _ => None,
+        };
         let finishers_count = s.timings.values()
             .filter(|t| t.course_id == *id
                 && matches!(t.status, crate::models::TimingStatus::Finished))
@@ -51,6 +56,7 @@ pub async fn poll_display(ctx: State<'_, AppCtx>) -> Result<DisplaySnapshot, App
             elapsed_ms,
             finishers_count,
             started: course.started_at_ms.is_some(),
+            ended: course.ended_at_ms.is_some(),
         });
     }
     courses.sort_by_key(|c| c.id);
@@ -165,6 +171,28 @@ pub async fn undo_finish(ctx: State<'_, AppCtx>, timing_id: i64) -> Result<(), A
 #[tauri::command]
 pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> Result<(), AppError> {
     crate::timer::delete_pending_finish(&ctx.state, &ctx.repo, pending_id).await
+}
+
+#[tauri::command]
+pub async fn end_course(app: AppHandle, ctx: State<'_, AppCtx>, course_id: i64, confirm_name: String)
+    -> Result<i64, AppError> {
+    let expected = {
+        let s = ctx.state.read().await;
+        s.courses.get(&course_id)
+            .ok_or_else(|| AppError::NotFound(format!("course {}", course_id)))?
+            .name.clone()
+    };
+    if confirm_name.trim() != expected {
+        return Err(AppError::InvalidState(
+            "nome del percorso non corrisponde".into()
+        ));
+    }
+    let ts = crate::timer::end_course(&ctx.state, &ctx.repo, &*ctx.clock, course_id).await?;
+    let _ = app.emit("course:ended", serde_json::json!({
+        "course_id": course_id,
+        "ended_at_ms": ts,
+    }));
+    Ok(ts)
 }
 
 #[tauri::command]

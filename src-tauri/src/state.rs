@@ -74,7 +74,7 @@ mod tests {
         migrations::run(&db.conn.lock().unwrap()).unwrap();
         let repo = Repo::new(db.conn.clone());
         repo.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                      started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         repo.upsert_athlete(&Athlete { id: 10, bib_number: 7, first_name: "a".into(),
                                         last_name: "b".into(), course_id: 1 }).unwrap();
         let s = bootstrap_from_db(&repo, &SystemClock).unwrap();

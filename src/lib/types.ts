@@ -6,6 +6,7 @@ export interface Course {
   distance_m: number | null;
   started_at_ms: number | null;
   scheduled_at_ms: number | null;
+  ended_at_ms: number | null;
 }
 
 export interface Athlete {
@@ -54,6 +55,7 @@ export interface CourseSnapshot {
   elapsed_ms: number | null;
   finishers_count: number;
   started: boolean;
+  ended: boolean;
 }
 
 export interface DisplaySnapshot {

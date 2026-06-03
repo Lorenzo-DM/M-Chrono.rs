@@ -4,6 +4,7 @@
   import { on } from '../events';
   import { formatMsToHms } from '../format';
   import type { Course, PendingFinish, AthleteRow } from '../types';
+  import EndRaceModal from './EndRaceModal.svelte';
 
   let {
     course,
@@ -19,12 +20,14 @@
 
   let elapsed = $state(0);
   let started = $state(false);
+  let ended = $state(false);
   let pending = $state<PendingFinish[]>([]);
   let finishers = $state<AthleteRow[]>([]);
   let flashing = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
   let bibInputs = $state<Record<number, string>>({});
+  let showEndModal = $state(false);
 
   $effect(() => {
     let alive = true;
@@ -36,6 +39,7 @@
         if (c) {
           elapsed = c.elapsed_ms ?? 0;
           started = c.started;
+          ended = c.ended;
         }
       } catch {
         // transient
@@ -147,7 +151,7 @@
     if (!active) return;
     const tgt = e.target as HTMLElement | null;
     if (tgt?.tagName === 'INPUT') return;
-    if (!started) return;
+    if (!started || ended) return;
     if (e.code === 'Space') {
       e.preventDefault();
       doRecord();
@@ -193,12 +197,19 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <span class={started ? 'dot-running' : 'dot-idle'}></span>
+      <span
+        class={ended ? 'dot-idle' : started ? 'dot-running' : 'dot-idle'}
+        style={ended ? 'background: var(--accent-finish)' : ''}
+      ></span>
       <span
         class="lane-status"
-        style="color: {started ? 'var(--accent-running)' : 'var(--fg-3)'}"
+        style="color: {ended
+          ? 'var(--accent-finish)'
+          : started
+            ? 'var(--accent-running)'
+            : 'var(--fg-3)'}"
       >
-        {started ? 'ACTIVE' : 'STANDBY'}
+        {ended ? 'TERMINATA' : started ? 'ACTIVE' : 'STANDBY'}
       </span>
     </div>
   </header>
@@ -230,21 +241,39 @@
       >
         ▶ START PERCORSO
       </button>
-    {:else}
+    {:else if ended}
       <button
-        class="btn-base btn-accent-tap w-full text-base font-semibold"
-        style="padding: 1rem 1rem; letter-spacing: 0.06em"
-        onclick={doRecord}
+        class="btn-base w-full text-base"
+        style="padding: 1rem 1rem; color: var(--fg-3); cursor: default"
+        disabled
       >
-        RECORD TIME
-        {#if active}
-          <span
-            class="kbd ml-2"
-            style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
-            >␣</span
-          >
-        {/if}
+        ■ GARA TERMINATA
       </button>
+    {:else}
+      <div class="flex gap-2">
+        <button
+          class="btn-base btn-accent-tap flex-1 text-base font-semibold"
+          style="padding: 1rem 1rem; letter-spacing: 0.06em"
+          onclick={doRecord}
+        >
+          RECORD TIME
+          {#if active}
+            <span
+              class="kbd ml-2"
+              style="background: transparent; color: inherit; border-color: currentColor; opacity: 0.75"
+              >␣</span
+            >
+          {/if}
+        </button>
+        <button
+          class="btn-end-race"
+          title="Termina gara"
+          aria-label="Termina gara"
+          onclick={() => (showEndModal = true)}
+        >
+          ■
+        </button>
+      </div>
     {/if}
   </div>
 
@@ -373,6 +402,17 @@
   {/if}
 </section>
 
+{#if showEndModal}
+  <EndRaceModal
+    {course}
+    onClose={() => (showEndModal = false)}
+    onDone={() => {
+      ended = true;
+      refresh();
+    }}
+  />
+{/if}
+
 <style>
   .lane-card {
     overflow: hidden;
@@ -430,5 +470,30 @@
   }
   .btn-icon-del:active {
     background: rgba(184, 85, 58, 0.2);
+  }
+  .btn-end-race {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;
+    border: 1px solid var(--accent-finish);
+    background: transparent;
+    color: var(--accent-finish);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    transition:
+      background 120ms ease,
+      color 120ms ease,
+      transform 80ms ease;
+  }
+  .btn-end-race:hover {
+    background: var(--accent-finish);
+    color: #f6f2e9;
+  }
+  .btn-end-race:active {
+    transform: translateY(1px);
   }
 </style>

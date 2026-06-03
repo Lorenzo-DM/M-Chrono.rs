@@ -3,6 +3,7 @@ import type { Timing, PendingFinish, SyncStatus } from './types';
 
 export type AppEvents = {
   'course:started': { course_id: number; started_at_ms: number };
+  'course:ended': { course_id: number; ended_at_ms: number };
   'athlete:finished': Timing;
   'pending:captured': PendingFinish;
   'sync:status': SyncStatus;

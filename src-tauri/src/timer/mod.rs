@@ -172,6 +172,31 @@ pub async fn delete_pending_finish(
     Ok(())
 }
 
+pub async fn end_course(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    course_id: i64,
+) -> AppResult<i64> {
+    let ts_ms = clock.now_ms();
+    let mut s = state.write().await;
+    let course = s.courses.get(&course_id).cloned()
+        .ok_or_else(|| AppError::NotFound(format!("course {}", course_id)))?;
+    if course.started_at_ms.is_none() {
+        return Err(AppError::InvalidState(
+            format!("course {} not started", course_id)
+        ));
+    }
+    if course.ended_at_ms.is_some() {
+        return Err(AppError::InvalidState(
+            format!("course {} already ended", course_id)
+        ));
+    }
+    repo.end_course(course_id, ts_ms)?;
+    if let Some(c) = s.courses.get_mut(&course_id) { c.ended_at_ms = Some(ts_ms); }
+    Ok(ts_ms)
+}
+
 #[cfg(test)]
 mod tests_finish {
     use super::*;
@@ -260,7 +285,7 @@ mod tests {
         let clock = Arc::new(MockClock::new(1_000_000));
         let repo = Arc::new(Repo::with_clock(db.conn.clone(), clock.clone()));
         repo.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                      started_at_ms: None, scheduled_at_ms: None }).unwrap();
+                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
         for i in 1..=3 {
             repo.upsert_athlete(&Athlete {
                 id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1

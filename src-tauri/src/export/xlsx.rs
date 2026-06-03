@@ -146,6 +146,7 @@ mod tests {
             distance_m: None,
             started_at_ms: None,
             scheduled_at_ms: None,
+            ended_at_ms: None,
         })
         .unwrap();
         repo.upsert_athlete(&Athlete {

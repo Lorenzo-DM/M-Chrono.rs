@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 const MIGRATIONS: &[(i32, &str)] = &[
     (1, include_str!("../../migrations/0001_init.sql")),
+    (2, include_str!("../../migrations/0002_course_ended_at.sql")),
 ];
 
 pub fn run(conn: &Connection) -> AppResult<()> {
@@ -45,7 +46,7 @@ mod tests {
         let count: i64 = conn.query_row(
             "SELECT count(*) FROM _migrations", [], |r| r.get(0)
         ).unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(count, MIGRATIONS.len() as i64);
         let courses_exists: i64 = conn.query_row(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='courses'",
             [], |r| r.get(0)
@@ -62,6 +63,6 @@ mod tests {
         let count: i64 = conn.query_row(
             "SELECT count(*) FROM _migrations", [], |r| r.get(0)
         ).unwrap();
-        assert_eq!(count, 1);
+        assert_eq!(count, MIGRATIONS.len() as i64);
     }
 }
