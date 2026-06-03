@@ -22,6 +22,8 @@ export const api = {
     invoke<Timing>('assign_pending', { pendingId, bib }),
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),
   undoFinish: (timingId: number) => invoke<void>('undo_finish', { timingId }),
+  deletePendingFinish: (pendingId: number) =>
+    invoke<void>('delete_pending_finish', { pendingId }),
   updateOperatorId: (id: string) => invoke<void>('update_operator_id', { id }),
   updateConfig: (patch: Partial<AppConfig>) =>
     invoke<AppConfig>('update_config', { patch }),

@@ -161,6 +161,17 @@ pub async fn undo_finish(
     Ok(())
 }
 
+pub async fn delete_pending_finish(
+    state: &SharedState,
+    repo: &Repo,
+    pending_id: i64,
+) -> AppResult<()> {
+    let mut s = state.write().await;
+    repo.delete_pending_finish(pending_id)?;
+    s.pending.retain(|p| p.id != pending_id);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests_finish {
     use super::*;

@@ -24,6 +24,7 @@ pub struct AthleteRow {
     pub status: String,
     pub finish_ms: Option<i64>,
     pub total_ms: Option<i64>,
+    pub timing_id: Option<i64>,
 }
 
 #[tauri::command]
@@ -73,6 +74,7 @@ pub async fn get_athletes_by_course(
                 .unwrap_or_else(|| "Registered".into()),
             finish_ms: timing.and_then(|t| t.finish_timestamp_ms),
             total_ms: timing.and_then(|t| t.total_time_ms),
+            timing_id: timing.map(|t| t.id),
         });
     }
     rows.sort_by_key(|r| r.athlete.bib_number);
@@ -158,6 +160,11 @@ pub async fn withdraw_athlete(ctx: State<'_, AppCtx>, bib: i64) -> Result<(), Ap
 #[tauri::command]
 pub async fn undo_finish(ctx: State<'_, AppCtx>, timing_id: i64) -> Result<(), AppError> {
     crate::timer::undo_finish(&ctx.state, &ctx.repo, timing_id).await
+}
+
+#[tauri::command]
+pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> Result<(), AppError> {
+    crate::timer::delete_pending_finish(&ctx.state, &ctx.repo, pending_id).await
 }
 
 #[tauri::command]

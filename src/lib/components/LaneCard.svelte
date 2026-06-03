@@ -117,6 +117,32 @@
     }
   }
 
+  async function doDeletePending(pid: number, tsMs: number) {
+    const label = formatMsToHms(tsMs % 86_400_000);
+    if (!window.confirm(`Eliminare il tempo ${label}? Operazione irreversibile.`)) return;
+    error = null;
+    try {
+      await api.deletePendingFinish(pid);
+      const next = { ...bibInputs };
+      delete next[pid];
+      bibInputs = next;
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
+  async function doUndoFinish(timingId: number, bib: number) {
+    if (!window.confirm(`Annullare l'arrivo del pettorale #${bib}? L'atleta torna in gara.`)) return;
+    error = null;
+    try {
+      await api.undoFinish(timingId);
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
   function handleKey(e: KeyboardEvent) {
     if (!active) return;
     const tgt = e.target as HTMLElement | null;
@@ -288,6 +314,18 @@
                 >
                   ✓
                 </button>
+                <button
+                  type="button"
+                  class="btn-icon-del"
+                  title="Elimina tempo"
+                  aria-label="Elimina tempo"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    doDeletePending(r.p.id, r.p.finish_timestamp_ms);
+                  }}
+                >
+                  ✕
+                </button>
               </form>
             </li>
           {:else}
@@ -304,6 +342,20 @@
               <div class="num text-sm" style="color: var(--fg-0); font-weight: 600">
                 {formatMsToHms(r.f.total_ms ?? 0)}
               </div>
+              {#if r.f.timing_id != null}
+                <button
+                  type="button"
+                  class="btn-icon-del"
+                  title="Annulla arrivo (errore)"
+                  aria-label="Annulla arrivo"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
+                  }}
+                >
+                  ✕
+                </button>
+              {/if}
             </li>
           {/if}
         {/each}
@@ -352,5 +404,31 @@
     padding: 0.35rem 0.4rem;
     font-size: 0.95rem;
     font-weight: 600;
+  }
+  .btn-icon-del {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.85rem;
+    height: 1.85rem;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fg-3);
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition:
+      background 120ms ease,
+      color 120ms ease,
+      border-color 120ms ease;
+  }
+  .btn-icon-del:hover {
+    background: rgba(184, 85, 58, 0.12);
+    color: var(--accent-finish);
+    border-color: rgba(184, 85, 58, 0.35);
+  }
+  .btn-icon-del:active {
+    background: rgba(184, 85, 58, 0.2);
   }
 </style>

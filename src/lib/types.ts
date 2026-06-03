@@ -46,6 +46,7 @@ export interface AthleteRow {
   status: TimingStatus;
   finish_ms: number | null;
   total_ms: number | null;
+  timing_id: number | null;
 }
 
 export interface CourseSnapshot {

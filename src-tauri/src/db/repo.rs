@@ -270,6 +270,17 @@ impl Repo {
         Ok(())
     }
 
+    pub fn delete_pending_finish(&self, pending_id: i64) -> AppResult<()> {
+        let n = self.lock().execute(
+            "DELETE FROM pending_finishes WHERE id = ?1 AND assigned = 0",
+            params![pending_id],
+        )?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("pending {}", pending_id)));
+        }
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub fn list_pending_open(&self, course_id: i64) -> AppResult<Vec<PendingFinish>> {
         let conn = self.lock();
