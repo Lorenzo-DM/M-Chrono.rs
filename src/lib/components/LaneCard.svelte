@@ -3,9 +3,10 @@
   import { api } from '../api';
   import { on } from '../events';
   import { formatMsToHms } from '../format';
-  import type { Course, PendingFinish, AthleteRow } from '../types';
+  import type { Course, PendingFinish, AthleteRow, Athlete } from '../types';
   import ConfirmRaceModal from './ConfirmRaceModal.svelte';
   import Button from '../ui/Button.svelte';
+  import BibCombobox from './BibCombobox.svelte';
 
   let {
     course,
@@ -27,7 +28,8 @@
   let flashing = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
-  let bibInputs = $state<Record<number, string>>({});
+  let selectedAthletes = $state<Record<number, Athlete | null>>({});
+  let allAthletes = $state<Athlete[]>([]);
   let showEndModal = $state(false);
   let showRestartModal = $state(false);
   let editingTimingId = $state<number | null>(null);
@@ -64,6 +66,7 @@
         api.getAthletesByCourse(course.id),
       ]);
       pending = [...p].sort((x, y) => y.finish_timestamp_ms - x.finish_timestamp_ms);
+      allAthletes = a.map(r => r.athlete);
       finishers = a
         .filter((r) => r.status === 'Finished')
         .sort((x, y) => (y.finish_ms ?? 0) - (x.finish_ms ?? 0));
@@ -121,17 +124,13 @@
 
   async function doAssign(pid: number) {
     error = null;
-    const raw = (bibInputs[pid] ?? '').trim();
-    const n = parseInt(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      error = 'pettorale non valido';
-      return;
-    }
+    const athlete = selectedAthletes[pid];
+    if (!athlete) { error = 'seleziona un atleta'; return; }
     try {
-      await api.assignPending(pid, n);
-      const next = { ...bibInputs };
+      await api.assignPending(pid, athlete.bib_number);
+      const next = { ...selectedAthletes };
       delete next[pid];
-      bibInputs = next;
+      selectedAthletes = next;
       await refresh();
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -401,8 +400,15 @@
           {#if r.kind === 'pending'}
             <li class="row row-pending slide-in">
               <span class="pos-chip">{r.pos}</span>
-              <span class="row-time num">
-                {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+              <span class="row-time-col">
+                <span class="num row-time">
+                  {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+                </span>
+                {#if course.started_at_ms}
+                  <span class="num row-elapsed">
+                    +{formatMsToHms(r.p.finish_timestamp_ms - course.started_at_ms)}
+                  </span>
+                {/if}
               </span>
               <form
                 class="row-main"
@@ -411,22 +417,17 @@
                   doAssign(r.p.id);
                 }}
               >
-                <input
-                  type="number"
-                  inputmode="numeric"
-                  placeholder="BIB"
-                  class="bib-input num"
-                  value={bibInputs[r.p.id] ?? ''}
-                  oninput={(e) =>
-                    (bibInputs = {
-                      ...bibInputs,
-                      [r.p.id]: (e.currentTarget as HTMLInputElement).value,
-                    })}
+                <BibCombobox
+                  athletes={allAthletes}
+                  compact
+                  onSelect={(a) => {
+                    selectedAthletes = { ...selectedAthletes, [r.p.id]: a };
+                  }}
                 />
-                <span class="row-hint">da assegnare</span>
                 <button
                   type="submit"
                   class="btn-row btn-row-confirm"
+                  disabled={!selectedAthletes[r.p.id]}
                   title="Assegna pettorale"
                   aria-label="Assegna pettorale"
                 >
@@ -579,7 +580,7 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 2.25rem 5.5rem 1fr;
+    grid-template-columns: 2.25rem 8rem 1fr;
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0.75rem;
@@ -624,10 +625,20 @@
     background: var(--accent-running);
     color: #f6f2e9;
   }
+  .row-time-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
   .row-time {
     color: var(--fg-0);
     font-weight: 700;
     font-size: 0.95rem;
+    letter-spacing: -0.01em;
+  }
+  .row-elapsed {
+    color: var(--fg-3);
+    font-size: 0.72rem;
     letter-spacing: -0.01em;
   }
   .row-main {
@@ -653,14 +664,6 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     flex: 1;
-  }
-  .bib-input {
-    width: 4.5rem;
-    text-align: center;
-    padding: 0.3rem 0.4rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    flex-shrink: 0;
   }
   .btn-row {
     display: inline-flex;

@@ -1,21 +1,39 @@
 <script lang="ts">
-  import type { PendingFinish } from '../types';
+  import { onMount } from 'svelte';
+  import type { PendingFinish, Athlete } from '../types';
   import { api } from '../api';
   import { formatMsToHms } from '../format';
+  import { courses } from '../stores';
   import Button from '../ui/Button.svelte';
+  import BibCombobox from './BibCombobox.svelte';
 
   let { pending, onClose }: { pending: PendingFinish; onClose: () => void } = $props();
-  let bib = $state('');
+
+  let athletes = $state<Athlete[]>([]);
+  let selected = $state<Athlete | null>(null);
   let error = $state<string | null>(null);
   let busy = $state(false);
 
+  let course = $derived($courses.find(c => c.id === pending.course_id));
+  let elapsedMs = $derived(
+    course?.started_at_ms != null
+      ? pending.finish_timestamp_ms - course.started_at_ms
+      : null
+  );
+
+  onMount(async () => {
+    try {
+      const rows = await api.getAthletesByCourse(pending.course_id);
+      athletes = rows.map(r => r.athlete);
+    } catch {}
+  });
+
   async function assign() {
+    if (!selected) return;
     error = null;
-    const n = parseInt(bib);
-    if (!Number.isFinite(n)) { error = 'pettorale non valido'; return; }
     busy = true;
     try {
-      await api.assignPending(pending.id, n);
+      await api.assignPending(pending.id, selected.bib_number);
       onClose();
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -23,8 +41,8 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'Enter') assign();
-    if (e.key === 'Escape') onClose();
+    if (e.key === 'Escape') { onClose(); return; }
+    if (e.key === 'Enter' && selected && !busy) assign();
   }
 </script>
 
@@ -38,28 +56,31 @@
     </div>
 
     <div class="p-6">
-      <div class="hud mb-2">TIMESTAMP CATTURATO</div>
-      <div class="chronodial num text-6xl mb-6" data-state="running">
+      <div class="hud mb-1">TIMESTAMP CATTURATO</div>
+      <div class="chronodial num text-6xl mb-1" data-state="running">
         {formatMsToHms(pending.finish_timestamp_ms % 86_400_000)}
       </div>
+      {#if elapsedMs !== null}
+        <div class="num text-2xl mb-6" style="color: var(--fg-2)">
+          +{formatMsToHms(elapsedMs)}
+        </div>
+      {:else}
+        <div class="mb-6"></div>
+      {/if}
 
-      <div class="hud mb-2">PETTORALE</div>
-      <!-- svelte-ignore a11y_autofocus -->
-      <input
-        bind:value={bib}
-        type="number"
-        inputmode="numeric"
-        class="w-full text-5xl tabular num"
+      <div class="hud mb-2">PETTORALE / ATLETA</div>
+      <BibCombobox
+        {athletes}
         autofocus
-        autocomplete="off"
-        placeholder="—"
+        onSelect={(a) => { selected = a; error = null; }}
       />
+
       {#if error}
         <div class="hud mt-3" style="color: var(--accent-finish)">⚠ {error}</div>
       {/if}
 
       <div class="flex gap-2 mt-6">
-        <Button variant="primary" class="flex-1 py-3" disabled={busy} onclick={assign}>
+        <Button variant="primary" class="flex-1 py-3" disabled={busy || !selected} onclick={assign}>
           ASSEGNA <span class="kbd ml-2" style="background:transparent; color:inherit; border-color:currentColor; opacity:0.6">↵</span>
         </Button>
         <Button class="flex-1 py-3" onclick={onClose}>ANNULLA</Button>

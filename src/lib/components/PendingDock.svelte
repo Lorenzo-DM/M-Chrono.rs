@@ -42,6 +42,12 @@
     return $courses.find(c => c.id === id)?.name ?? `#${id}`;
   }
 
+  function elapsedForPending(p: PendingFinish): number | null {
+    const course = $courses.find(c => c.id === p.course_id);
+    if (!course?.started_at_ms) return null;
+    return p.finish_timestamp_ms - course.started_at_ms;
+  }
+
   $effect(() => {
     if (typeof document === 'undefined') return;
     const cls = 'has-dock-drawer';
@@ -98,12 +104,17 @@
                 <span class="hud" style="color: var(--accent-pending)">#{p.id}</span>
                 <span class="hud">{courseName(p.course_id)}</span>
               </div>
-              <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
                 <span class="num text-xl" style="color: var(--fg-0)">
                   {formatMsToHms(p.finish_timestamp_ms % 86_400_000)}
                 </span>
-                <span class="hud" style="color: var(--fg-3)">{p.operator_id}</span>
+                {#if elapsedForPending(p) !== null}
+                  <span class="num text-sm" style="color: var(--fg-3)">
+                    +{formatMsToHms(elapsedForPending(p)!)}
+                  </span>
+                {/if}
               </div>
+              <div class="hud text-xs" style="color: var(--fg-3)">{p.operator_id}</div>
             </button>
           </li>
         {/each}
