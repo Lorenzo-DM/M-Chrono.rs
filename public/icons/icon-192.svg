@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="TrailTrace">
+  <rect width="192" height="192" rx="40" fill="#0d530e"/>
+  <rect x="40" y="40" width="112" height="112" rx="22" fill="#fbf5dd"/>
+  <text x="96" y="116" text-anchor="middle" font-family="IBM Plex Sans, Arial, sans-serif" font-size="62" font-weight="700" fill="#0d530e">TT</text>
+</svg>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Course } from '../types';
+  import Button from '../ui/Button.svelte';
 
   type Variant = 'end' | 'restart';
 
@@ -76,7 +77,7 @@
       <div class="hud-strong" style="color: {copy.titleColor}">
         {copy.title}
       </div>
-      <button class="btn-base btn-ghost text-xs" onclick={onClose}>ESC</button>
+      <Button variant="ghost" size="sm" onclick={onClose}>ESC</Button>
     </div>
 
     <div class="p-6">
@@ -116,9 +117,9 @@
       {/if}
 
       <div class="flex gap-2 mt-6">
-        <button class="btn-base flex-1 py-3" onclick={onClose}>ANNULLA</button>
-        <button
-          class="btn-base flex-1 py-3"
+        <Button class="flex-1 py-3" onclick={onClose}>ANNULLA</Button>
+        <Button
+          class="flex-1 py-3"
           style={matches
             ? `background: ${copy.ctaBg}; border-color: ${copy.ctaBg}; color: #f6f2e9`
             : ''}
@@ -126,7 +127,7 @@
           onclick={confirm}
         >
           {busy ? copy.busy : copy.cta}
-        </button>
+        </Button>
       </div>
     </div>
   </div>

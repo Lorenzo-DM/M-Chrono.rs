@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "@skeletonlabs/skeleton";
-@import "@skeletonlabs/skeleton/themes/rocket";
 @import "@fontsource-variable/ibm-plex-sans";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
@@ -10,38 +9,39 @@
 :root {
     color-scheme: light;
 
-    /* Surfaces — birch parchment / mountain mist */
-    --bg-0: #f6f2e9;       /* birch paper */
-    --bg-1: #ece6d5;       /* warm parchment */
-    --bg-2: #dfd6bf;       /* stone */
-    --bg-3: #c9beA0;       /* dry moss */
-    --bg-4: #a89c7a;       /* lichen */
+    /* Surfaces */
+    --bg-0: #fbf5dd;
+    --bg-1: #f3ebc9;
+    --bg-2: #e7e1b1;
+    --bg-3: #d4cc93;
+    --bg-4: #b5ab76;
 
-    /* Lines — subtle bark */
-    --line-1: #d8cfb6;
-    --line-2: #b9ad8e;
-    --line-3: #8c8164;
+    /* Lines */
+    --line-1: #d4cc93;
+    --line-2: #b5ab76;
+    --line-3: #8a7f4d;
 
-    /* Text — deep forest ramp */
-    --fg-0: #1a2418;       /* pine bark near-black */
-    --fg-1: #2f3a2a;       /* dark moss */
-    --fg-2: #5b6a52;       /* sage */
-    --fg-3: #8a957f;       /* lichen */
+    /* Text */
+    --fg-0: #0d530e;
+    --fg-1: #1f4a1c;
+    --fg-2: #4a6940;
+    --fg-3: #7a8a6f;
 
-    /* Accents — alpine sport palette */
-    --accent-running: #2f6b46;   /* pine green - primary running */
-    --accent-start:   #4a8c4f;   /* fresh moss - start */
-    --accent-finish:  #b8553a;   /* terracotta / autumn leaf */
-    --accent-pending: #c08a2a;   /* honey amber - golden hour */
-    --accent-warn:    #b88930;   /* sunset gold */
-    --accent-dup:     #8a5a32;   /* bark brown */
-    --accent-sky:     #3b7a9c;   /* alpine sky blue */
+    /* Accents */
+    --accent-running: #306d29;
+    --accent-start:   #306d29;
+    --accent-warm:    #c8541f;
+    --accent-finish:  var(--accent-warm);
+    --accent-pending: #d98e2a;
+    --accent-warn:    #b8390f;
+    --accent-dup:     var(--accent-warn);
+    --accent-sky:     #4a7a8c;
 
     /* Operator color codes */
-    --op-a: #2f6b46;       /* pine */
-    --op-b: #b8553a;       /* terracotta */
-    --op-c: #3b7a9c;       /* alpine sky */
-    --op-d: #c08a2a;       /* honey */
+    --op-a: var(--accent-running);
+    --op-b: var(--accent-warm);
+    --op-c: var(--accent-sky);
+    --op-d: var(--accent-pending);
 
     /* Radii */
     --radius-sm: 6px;
@@ -50,10 +50,42 @@
     --radius-xl: 18px;
     --radius-pill: 999px;
 
-    /* Shadows — soft ambient */
-    --shadow-sm: 0 1px 2px rgba(26, 36, 24, 0.05);
-    --shadow-md: 0 4px 12px rgba(26, 36, 24, 0.07);
-    --shadow-lg: 0 10px 30px rgba(26, 36, 24, 0.10);
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(13, 83, 14, 0.06);
+    --shadow-md: 0 4px 12px rgba(13, 83, 14, 0.08);
+    --shadow-lg: 0 10px 30px rgba(13, 83, 14, 0.12);
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg-0: #0a2e0b;
+    --bg-1: #11401a;
+    --bg-2: #1a5424;
+    --bg-3: #2a6b36;
+    --bg-4: #3a8246;
+
+    --line-1: #2a6b36;
+    --line-2: #3a8246;
+    --line-3: #5ba253;
+
+    --fg-0: #fbf5dd;
+    --fg-1: #e7e1b1;
+    --fg-2: #9fb592;
+    --fg-3: #6a8060;
+
+    --accent-running: #5ba253;
+    --accent-start:   #5ba253;
+    --accent-warm:    #e87648;
+    --accent-finish:  var(--accent-warm);
+    --accent-pending: #f2a347;
+    --accent-warn:    #e04b1f;
+    --accent-dup:     var(--accent-warn);
+    --accent-sky:     #6ea4bd;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -85,36 +117,32 @@ input[type="number"] {
 }
 
 body {
-    /* Mountain mist gradient overlay */
     background-image:
         radial-gradient(
             ellipse at top,
-            rgba(255, 255, 255, 0.55) 0%,
-            transparent 45%
-        ),
-        radial-gradient(
-            ellipse at bottom right,
-            rgba(47, 107, 70, 0.06) 0%,
+            rgba(255, 255, 255, 0.45) 0%,
             transparent 50%
         ),
         radial-gradient(
-            ellipse at bottom left,
-            rgba(184, 85, 58, 0.05) 0%,
-            transparent 45%
+            ellipse at bottom right,
+            rgba(48, 109, 41, 0.05) 0%,
+            transparent 55%
         );
     background-attachment: fixed;
 }
 
-/* Faint paper grain */
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 1000;
-    opacity: 0.045;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    mix-blend-mode: multiply;
+[data-theme="dark"] body {
+    background-image:
+        radial-gradient(
+            ellipse at top,
+            rgba(91, 162, 83, 0.08) 0%,
+            transparent 55%
+        ),
+        radial-gradient(
+            ellipse at bottom right,
+            rgba(0, 0, 0, 0.12) 0%,
+            transparent 58%
+        );
 }
 
 /* Section labels — editorial small-caps */
@@ -187,24 +215,24 @@ body::before {
 
 .btn-primary {
     background: var(--accent-running);
-    color: #f6f2e9;
+    color: #fbf5dd;
     border-color: var(--accent-running);
 }
 .btn-primary:hover {
     background: #245636;
     border-color: #245636;
-    color: #f6f2e9;
+    color: #fbf5dd;
 }
 
 .btn-accent-start {
     background: var(--accent-start);
-    color: #f6f2e9;
+    color: #fbf5dd;
     border-color: var(--accent-start);
 }
 .btn-accent-start:hover {
     background: #3d7541;
     border-color: #3d7541;
-    color: #f6f2e9;
+    color: #fbf5dd;
 }
 
 .btn-accent-tap {
@@ -229,7 +257,7 @@ body::before {
     color: var(--accent-finish);
 }
 .btn-accent-finish:hover {
-    background: rgba(184, 85, 58, 0.1);
+    background: rgba(200, 84, 31, 0.1);
 }
 
 .btn-ghost {
@@ -241,6 +269,26 @@ body::before {
     color: var(--fg-0);
     background: var(--bg-2);
     border-color: var(--line-1);
+}
+
+.btn-danger {
+    background: var(--accent-warn);
+    color: #fbf5dd;
+    border-color: var(--accent-warn);
+}
+.btn-danger:hover {
+    background: #992f0f;
+    border-color: #992f0f;
+    color: #fbf5dd;
+}
+
+.btn-sm {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+}
+.btn-lg {
+    padding: 0.8rem 1.2rem;
+    font-size: 1rem;
 }
 
 /* Inputs — rounded */
@@ -264,8 +312,8 @@ input:focus,
 select:focus,
 textarea:focus {
     border-color: var(--accent-running);
-    box-shadow: 0 0 0 3px rgba(47, 107, 70, 0.15);
-    background: #fdfaf2;
+    box-shadow: 0 0 0 3px rgba(13, 83, 14, 0.15);
+    background: #fff8e6;
 }
 
 /* Big chrono display */
@@ -294,7 +342,7 @@ textarea:focus {
 }
 .dot-running {
     background: var(--accent-running);
-    box-shadow: 0 0 0 3px rgba(47, 107, 70, 0.18);
+    box-shadow: 0 0 0 3px rgba(13, 83, 14, 0.18);
 }
 .dot-idle {
     background: var(--fg-3);
@@ -308,11 +356,11 @@ textarea:focus {
     0%,
     100% {
         opacity: 1;
-        box-shadow: 0 0 0 3px rgba(47, 107, 70, 0.18);
+        box-shadow: 0 0 0 3px rgba(13, 83, 14, 0.18);
     }
     50% {
         opacity: 0.7;
-        box-shadow: 0 0 0 6px rgba(47, 107, 70, 0.08);
+        box-shadow: 0 0 0 6px rgba(13, 83, 14, 0.08);
     }
 }
 .dot-running {
@@ -322,13 +370,13 @@ textarea:focus {
 /* Capture flash */
 @keyframes capture-flash {
     0% {
-        background: rgba(192, 138, 42, 0);
+        background: rgba(217, 142, 42, 0);
     }
     10% {
-        background: rgba(192, 138, 42, 0.22);
+        background: rgba(217, 142, 42, 0.22);
     }
     100% {
-        background: rgba(192, 138, 42, 0);
+        background: rgba(217, 142, 42, 0);
     }
 }
 .flash-capture {
@@ -382,7 +430,7 @@ textarea:focus {
 .modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(26, 36, 24, 0.5);
+    background: rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(6px);
     z-index: 100;
     display: flex;
@@ -554,4 +602,8 @@ textarea:focus {
 }
 .step-pip[data-state="active"] {
     background: var(--accent-running);
+}
+
+body.has-dock-drawer {
+    padding-bottom: 3.25rem;
 }

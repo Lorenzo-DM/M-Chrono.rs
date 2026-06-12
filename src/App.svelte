@@ -4,9 +4,11 @@
   import { courses, config, activeCourseId, isAuthenticated, type NavView } from './lib/stores';
   import Header from './lib/components/Header.svelte';
   import Workspace from './lib/components/Workspace.svelte';
+  import PendingDock from './lib/components/PendingDock.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
   import IntroFlow from './lib/components/IntroFlow.svelte';
+  import Button from './lib/ui/Button.svelte';
 
   type View = NavView | 'intro';
   let view = $state<View>('timing');
@@ -95,7 +97,12 @@
 
     <main class="flex-1 min-h-0 overflow-hidden">
       {#if view === 'timing'}
-        <Workspace />
+        <div class="h-full min-h-0 flex">
+          <div class="flex-1 min-w-0 h-full">
+            <Workspace />
+          </div>
+          <PendingDock />
+        </div>
       {:else if view === 'settings'}
         <SettingsPage onBack={() => (view = 'timing')} />
       {:else if view === 'results'}
@@ -107,7 +114,7 @@
               Classifica globale e per percorso, filtri per categoria, ordinamento e
               ricerca. Per ora consulta la coda di arrivi sotto ciascun timer.
             </div>
-            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
+            <Button class="mt-5" onclick={() => (view = 'timing')}>← TIMING</Button>
           </div>
         </div>
       {:else if view === 'export'}
@@ -120,7 +127,7 @@
               frattempo i tempi catturati vengono salvati localmente e sincronizzati
               con il cloud.
             </div>
-            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
+            <Button class="mt-5" onclick={() => (view = 'timing')}>← TIMING</Button>
           </div>
         </div>
       {/if}

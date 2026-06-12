@@ -2,6 +2,7 @@
   import type { PendingFinish } from '../types';
   import { api } from '../api';
   import { formatMsToHms } from '../format';
+  import Button from '../ui/Button.svelte';
 
   let { pending, onClose }: { pending: PendingFinish; onClose: () => void } = $props();
   let bib = $state('');
@@ -33,7 +34,7 @@
   <div class="panel-2 w-full max-w-lg">
     <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
       <div class="hud-strong" style="color: var(--accent-pending)">ASSEGNA PETTORALE</div>
-      <button class="btn-base btn-ghost text-xs" onclick={onClose}>ESC</button>
+      <Button variant="ghost" size="sm" onclick={onClose}>ESC</Button>
     </div>
 
     <div class="p-6">
@@ -58,10 +59,10 @@
       {/if}
 
       <div class="flex gap-2 mt-6">
-        <button class="btn-base btn-primary flex-1 py-3" disabled={busy} onclick={assign}>
+        <Button variant="primary" class="flex-1 py-3" disabled={busy} onclick={assign}>
           ASSEGNA <span class="kbd ml-2" style="background:transparent; color:inherit; border-color:currentColor; opacity:0.6">↵</span>
-        </button>
-        <button class="btn-base flex-1 py-3" onclick={onClose}>ANNULLA</button>
+        </Button>
+        <Button class="flex-1 py-3" onclick={onClose}>ANNULLA</Button>
       </div>
     </div>
   </div>

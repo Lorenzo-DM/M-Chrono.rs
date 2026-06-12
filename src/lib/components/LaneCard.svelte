@@ -5,6 +5,7 @@
   import { formatMsToHms } from '../format';
   import type { Course, PendingFinish, AthleteRow } from '../types';
   import ConfirmRaceModal from './ConfirmRaceModal.svelte';
+  import Button from '../ui/Button.svelte';
 
   let {
     course,
@@ -266,31 +267,33 @@
       </span>
 
       {#if started && !ended}
-        <button
-          class="btn-header-end"
+        <Button
+          variant="finish"
+          size="sm"
           title="Termina gara"
-          aria-label="Termina gara"
+          ariaLabel="Termina gara"
           onclick={(e) => {
             e.stopPropagation();
             showEndModal = true;
           }}
         >
           ■ TERMINA
-        </button>
+        </Button>
       {/if}
 
       {#if ended}
-        <button
-          class="btn-header-restart"
+        <Button
+          variant="tap"
+          size="sm"
           title="Riavvia gara (azzera timer)"
-          aria-label="Riavvia gara"
+          ariaLabel="Riavvia gara"
           onclick={(e) => {
             e.stopPropagation();
             showRestartModal = true;
           }}
         >
           ↻ RIAVVIA
-        </button>
+        </Button>
       {/if}
     </div>
   </header>
@@ -314,26 +317,28 @@
   <!-- Action -->
   <div class="p-3 shrink-0 border-b" style="border-color: var(--line-2)">
     {#if !started}
-      <button
-        class="btn-base btn-accent-start w-full text-base font-semibold"
+      <Button
+        variant="start"
+        class="w-full text-base font-semibold"
         style="padding: 1rem 1rem"
         disabled={busy}
         onclick={doStart}
       >
         ▶ START PERCORSO
-      </button>
+      </Button>
     {:else if ended}
-      <button
-        class="btn-base w-full text-base"
+      <Button
+        class="w-full text-base"
         style="padding: 1rem 1rem; color: var(--fg-3); cursor: default"
         disabled
       >
         ■ GARA TERMINATA
-      </button>
+      </Button>
     {:else}
       <div class="flex gap-2">
-        <button
-          class="btn-base btn-accent-tap flex-1 text-base font-semibold"
+        <Button
+          variant="tap"
+          class="flex-1 text-base font-semibold"
           style="padding: 1rem 1rem; letter-spacing: 0.06em"
           onclick={doRecord}
         >
@@ -345,7 +350,7 @@
               >␣</span
             >
           {/if}
-        </button>
+        </Button>
         <button
           class="btn-tie"
           title={pending.length > 0
@@ -697,43 +702,6 @@
   }
   .btn-row-danger:active {
     background: rgba(184, 85, 58, 0.2);
-  }
-  .btn-header-end,
-  .btn-header-restart {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.32rem 0.65rem;
-    border-radius: var(--radius-pill);
-    border: 1px solid currentColor;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition:
-      background 120ms ease,
-      color 120ms ease,
-      transform 80ms ease;
-  }
-  .btn-header-end {
-    color: var(--accent-finish);
-  }
-  .btn-header-end:hover {
-    background: var(--accent-finish);
-    color: #f6f2e9;
-  }
-  .btn-header-restart {
-    color: var(--accent-pending);
-  }
-  .btn-header-restart:hover {
-    background: var(--accent-pending);
-    color: #f6f2e9;
-  }
-  .btn-header-end:active,
-  .btn-header-restart:active {
-    transform: translateY(1px);
   }
   .btn-tie {
     display: inline-flex;

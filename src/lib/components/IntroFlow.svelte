@@ -5,6 +5,7 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { config, courses, isAuthenticated } from '../stores';
   import type { AppConfig, DeviceCodeResponse } from '../types';
+  import Button from '../ui/Button.svelte';
 
   let { onReady }: { onReady: () => void } = $props();
 
@@ -327,16 +328,16 @@
               Verrà generato un codice device. Aprilo nel browser, conferma,
               e l'app proseguirà automaticamente.
             </p>
-            <button class="btn-base btn-primary mt-8 px-6 py-3" onclick={startLogin}>
+            <Button variant="primary" class="mt-8 px-6 py-3" onclick={startLogin}>
               GENERA CODICE
-            </button>
+            </Button>
           {:else if loginError}
             <div class="mt-8 max-w-xl panel p-5" style="border-color: var(--accent-finish)">
               <div class="hud" style="color: var(--accent-finish)">ERRORE</div>
               <p class="mt-2" style="color: var(--fg-0)">{loginError}</p>
-              <button class="btn-base mt-4" onclick={() => { loginError = null; devResp = null; startLogin(); }}>
+              <Button class="mt-4" onclick={() => { loginError = null; devResp = null; startLogin(); }}>
                 RIPROVA
-              </button>
+              </Button>
             </div>
           {:else if devResp}
             <div class="mt-8 grid grid-cols-12 gap-6">
@@ -380,9 +381,9 @@
           </p>
 
           <div class="mt-8 flex items-center gap-4">
-            <button class="btn-base btn-primary px-6 py-3" disabled={syncing} onclick={runSync}>
+            <Button variant="primary" class="px-6 py-3" disabled={syncing} onclick={runSync}>
               {syncing ? 'SINCRONIZZAZIONE…' : 'SINCRONIZZA ORA'}
-            </button>
+            </Button>
             {#if syncSummary}
               <div class="flex items-center gap-2">
                 <span class="dot-running" style="background: var(--accent-start); animation: none;"></span>
@@ -407,17 +408,19 @@
           style="border-color: var(--line-2); background: var(--bg-1)">
     <div>
       {#if step > 0}
-        <button class="btn-base btn-ghost" onclick={prevStep}>← INDIETRO</button>
+        <Button variant="ghost" onclick={prevStep}>← INDIETRO</Button>
       {/if}
     </div>
 
     <div class="flex items-center gap-3">
       {#if step === 4 && !$isAuthenticated}
-        <button class="btn-base btn-ghost" onclick={skipLogin} title="Salta per ora">
+        <Button variant="ghost" onclick={skipLogin} title="Salta per ora">
           SALTA LOGIN
-        </button>
+        </Button>
       {/if}
-      <button class="btn-base btn-primary px-6 py-3"
+      <Button
+              variant="primary"
+              class="px-6 py-3"
               disabled={savingConfig || (step === 5 && !syncSummary)}
               onclick={nextStep}>
         {#if step === 5}
@@ -425,7 +428,7 @@
         {:else}
           AVANTI →
         {/if}
-      </button>
+      </Button>
     </div>
   </footer>
 </div>

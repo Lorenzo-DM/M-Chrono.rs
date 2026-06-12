@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { breakpoint } from '../breakpoint';
   import { syncStatus, config, layoutMode } from '../stores';
   import type { LayoutMode, NavView } from '../stores';
+  import { cycleQuickToggle, resolvedTheme } from '../theme';
+  import Button from '../ui/Button.svelte';
+  import SegmentedControl from '../ui/SegmentedControl.svelte';
 
   let {
     current = 'timing',
@@ -34,84 +38,198 @@
     if (last === 'D') return 'var(--op-d)';
     return 'var(--accent-running)';
   }
+
+  let mobileDrawerOpen = $state(false);
+  let isMobile = $derived($breakpoint === 'mobile');
+
+  $effect(() => {
+    if (!isMobile) {
+      mobileDrawerOpen = false;
+    }
+  });
+
+  function closeDrawer() {
+    mobileDrawerOpen = false;
+  }
+
+  function navClick(id: NavView) {
+    onNav(id);
+    closeDrawer();
+  }
+
+  function duplicatesClick() {
+    onDuplicates();
+    closeDrawer();
+  }
 </script>
 
-<header class="border-b" style="background: var(--bg-1); border-color: var(--line-2); box-shadow: var(--shadow-sm)">
-  <div class="flex items-center gap-6 px-5 py-3">
+<header
+  class="border-b"
+  style="background: var(--bg-1); border-color: var(--line-2); box-shadow: var(--shadow-sm)"
+>
+  <div class="flex items-center gap-3 sm:gap-4 lg:gap-6 px-3 sm:px-4 lg:px-5 py-3">
     <!-- Brand -->
     <div class="flex items-center gap-3 shrink-0">
-      <div class="hud-strong text-base" style="color: var(--fg-0); letter-spacing: 0.08em">
+      <div class="hud-strong text-sm sm:text-base" style="color: var(--fg-0); letter-spacing: 0.08em">
         TRAIL<span style="color: var(--accent-running)">·</span>TRACE
       </div>
-      <div class="hud" style="color: var(--fg-3)">CHRONO v0.1</div>
+      <div class="hud hidden sm:block" style="color: var(--fg-3)">CHRONO v0.1</div>
     </div>
-
-    <!-- Nav -->
-    <nav class="flex items-center gap-1 ml-4">
-      {#each navItems as n (n.id)}
-        <button
-          class="nav-link"
-          data-active={current === n.id}
-          data-disabled={!n.enabled}
-          disabled={!n.enabled}
-          onclick={() => n.enabled && onNav(n.id)}
-          title={n.enabled ? n.label : `${n.label} — prossimamente`}
-        >
-          {n.label}
-        </button>
-      {/each}
-    </nav>
 
     <div class="flex-1"></div>
 
-    <!-- Layout switcher (timing view only) -->
-    {#if current === 'timing'}
-      <div class="seg" title="Layout">
-        {#each modes as m (m.id)}
-          <button
-            class="seg-item"
-            data-active={$layoutMode === m.id}
-            onclick={() => layoutMode.set(m.id)}
-            aria-label={m.label}
-            title={m.label}
+    {#if isMobile}
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
+          {$config?.operator_id || 'NO-OP'}
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span
+            class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+            style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+          ></span>
+          <div
+            class="hud hidden sm:block"
+            style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
           >
-            <span class="num">{m.icon}</span>
+            {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+          </div>
+        </div>
+
+        <Button
+          variant="ghost"
+          class="text-xs px-2 py-2"
+          onclick={() => (mobileDrawerOpen = !mobileDrawerOpen)}
+          ariaLabel="Menu"
+          ariaExpanded={mobileDrawerOpen}
+          title="Menu"
+        >
+          ☰
+        </Button>
+      </div>
+    {:else}
+      <!-- Nav -->
+      <nav class="flex items-center gap-1 ml-1 lg:ml-4">
+        {#each navItems as n (n.id)}
+          <button
+            class="nav-link"
+            data-active={current === n.id}
+            data-disabled={!n.enabled}
+            disabled={!n.enabled}
+            onclick={() => n.enabled && onNav(n.id)}
+            title={n.enabled ? n.label : `${n.label} — prossimamente`}
+          >
+            {n.label}
           </button>
         {/each}
+      </nav>
+
+      <div class="flex-1"></div>
+
+      <!-- Layout switcher (timing view only) -->
+      {#if current === 'timing'}
+        <SegmentedControl
+          ariaLabel="Layout"
+          options={modes.map((m) => ({ value: m.id, label: m.icon, title: m.label }))}
+          value={$layoutMode}
+          onChange={(v) => layoutMode.set(v as LayoutMode)}
+        />
+      {/if}
+
+      <!-- Status cluster -->
+      <div class="flex items-center gap-2 lg:gap-4 shrink-0">
+        <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
+          {$config?.operator_id || 'NO-OP'}
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span
+            class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+            style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+          ></span>
+          <div
+            class="hud hidden lg:block"
+            style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
+          >
+            {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+          </div>
+        </div>
+
+        <div class="hud hidden lg:block">
+          <span style="color: var(--fg-2)">QUEUE</span>
+          <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={cycleQuickToggle}
+          title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
+          ariaLabel="Cambia tema"
+        >
+          {$resolvedTheme === 'dark' ? '☀' : '☾'}
+        </Button>
+
+        <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+          <span style="color: var(--accent-dup)">⚠</span> DUP
+        </Button>
       </div>
     {/if}
-
-    <!-- Status cluster -->
-    <div class="flex items-center gap-4 shrink-0">
-      <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
-        {$config?.operator_id || 'NO-OP'}
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span
-          class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
-          style={$syncStatus.is_online
-            ? ''
-            : 'background: var(--accent-pending);'}
-        ></span>
-        <div
-          class="hud"
-          style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
-        >
-          {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
-        </div>
-      </div>
-
-      <div class="hud">
-        <span style="color: var(--fg-2)">QUEUE</span>
-        <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
-      </div>
-
-      <button class="btn-base btn-ghost text-xs" onclick={onDuplicates} title="Duplicati">
-        <span style="color: var(--accent-dup)">⚠</span> DUP
-      </button>
-    </div>
   </div>
+
+  {#if isMobile && mobileDrawerOpen}
+    <div
+      class="border-t px-3 py-3 flex flex-col gap-3"
+      style="border-color: var(--line-2); background: var(--bg-1)"
+    >
+      <nav class="flex flex-wrap gap-1">
+        {#each navItems as n (n.id)}
+          <button
+            class="nav-link"
+            data-active={current === n.id}
+            data-disabled={!n.enabled}
+            disabled={!n.enabled}
+            onclick={() => n.enabled && navClick(n.id)}
+            title={n.enabled ? n.label : `${n.label} — prossimamente`}
+          >
+            {n.label}
+          </button>
+        {/each}
+      </nav>
+
+      {#if current === 'timing'}
+        <SegmentedControl
+          fullWidth
+          ariaLabel="Layout"
+          options={modes.map((m) => ({ value: m.id, label: m.icon, title: m.label }))}
+          value={$layoutMode}
+          onChange={(v) => layoutMode.set(v as LayoutMode)}
+        />
+      {/if}
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="hud">
+          <span style="color: var(--fg-2)">QUEUE</span>
+          <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={cycleQuickToggle}
+          title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
+          ariaLabel="Cambia tema"
+        >
+          {$resolvedTheme === 'dark' ? '☀ Chiaro' : '☾ Scuro'}
+        </Button>
+
+        <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+          <span style="color: var(--accent-dup)">⚠</span> DUP
+        </Button>
+      </div>
+    </div>
+  {/if}
 </header>
 
 <style>

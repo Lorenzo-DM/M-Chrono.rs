@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { api } from '../api';
   import { formatMsToHms } from '../format';
+  import Button from '../ui/Button.svelte';
 
   let { onClose }: { onClose: () => void } = $props();
   let groups = $state<any[]>([]);
@@ -31,8 +32,8 @@
         <div class="hud">{groups.length}</div>
       </div>
       <div class="flex gap-2">
-        <button class="btn-base btn-ghost text-xs px-2 py-1" onclick={refresh}>↻ AGGIORNA</button>
-        <button class="btn-base btn-ghost text-xs" onclick={onClose}>ESC</button>
+        <Button variant="ghost" size="sm" class="px-2 py-1" onclick={refresh}>↻ AGGIORNA</Button>
+        <Button variant="ghost" size="sm" onclick={onClose}>ESC</Button>
       </div>
     </div>
 

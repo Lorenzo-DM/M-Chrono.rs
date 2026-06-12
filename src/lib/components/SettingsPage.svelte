@@ -1,6 +1,10 @@
 <script lang="ts">
     import { api } from "../api";
     import { config, isAuthenticated as isAuthStore, courses } from "../stores";
+    import { themeMode } from "../theme";
+    import type { ThemeMode } from "../theme";
+    import Button from "../ui/Button.svelte";
+    import SegmentedControl from "../ui/SegmentedControl.svelte";
     import DeviceLoginModal from "./DeviceLoginModal.svelte";
     import { save as saveDialog } from "@tauri-apps/plugin-dialog";
     import type { AppConfig } from "../types";
@@ -67,7 +71,7 @@
             syncStatus = `OK · ${s.courses_count} percorsi · ${s.athletes_count} atleti`;
             courses.set(await api.getCourses());
         } catch (e: any) {
-            syncStatus = `ERRORE · ${e?.message ?? e}`;
+            syncStatus = `ERRORE · ${e?.message ?? JSON.stringify(e)}`;
         }
     }
 
@@ -173,13 +177,14 @@
 
         <!-- Save button -->
         <div class="col-span-12 flex items-center gap-3">
-            <button
-                class="btn-base btn-primary px-6 py-3"
+            <Button
+                variant="primary"
                 disabled={saving}
                 onclick={save}
+                class="px-6 py-3"
             >
                 {saving ? "SALVATAGGIO…" : "SALVA CONFIGURAZIONE"}
-            </button>
+            </Button>
             {#if saved}
                 <span class="hud" style="color: var(--accent-start)"
                     >✓ SALVATO</span
@@ -197,7 +202,7 @@
                         >LOGIN ATTIVO</span
                     >
                 </div>
-                <button class="btn-base mt-4" onclick={doLogout}>LOGOUT</button>
+                <Button class="mt-4" onclick={doLogout}>LOGOUT</Button>
             {:else}
                 <div class="flex items-center gap-3">
                     <span
@@ -208,19 +213,14 @@
                         >NON AUTENTICATO</span
                     >
                 </div>
-                <button
-                    class="btn-base btn-primary mt-4"
-                    onclick={() => (showLogin = true)}>ACCEDI</button
-                >
+                <Button variant="primary" class="mt-4" onclick={() => (showLogin = true)}>ACCEDI</Button>
             {/if}
         </section>
 
         <!-- Data -->
         <section class="panel p-4 col-span-6">
             <div class="hud mb-3">DATI GARA</div>
-            <button class="btn-base btn-primary" onclick={doSyncData}
-                >SINCRONIZZA ATLETI/PERCORSI</button
-            >
+            <Button variant="primary" onclick={doSyncData}>SINCRONIZZA ATLETI/PERCORSI</Button>
             {#if syncStatus}
                 <div class="hud mt-3" style="color: var(--fg-1)">
                     {syncStatus}
@@ -228,12 +228,25 @@
             {/if}
         </section>
 
+        <!-- Aspetto -->
+        <section class="panel p-4 col-span-6">
+            <div class="hud mb-3">ASPETTO</div>
+            <SegmentedControl
+                ariaLabel="Tema"
+                options={[
+                    { value: 'auto', label: 'Auto', title: 'Tema automatico' },
+                    { value: 'light', label: 'Chiaro', title: 'Tema chiaro' },
+                    { value: 'dark', label: 'Scuro', title: 'Tema scuro' },
+                ]}
+                value={$themeMode}
+                onChange={(v) => themeMode.set(v as ThemeMode)}
+            />
+        </section>
+
         <!-- Export -->
         <section class="panel p-4 col-span-12">
             <div class="hud mb-3">EXPORT</div>
-            <button class="btn-base" onclick={doExport}
-                >ESPORTA RISULTATI XLSX</button
-            >
+            <Button onclick={doExport}>ESPORTA RISULTATI XLSX</Button>
         </section>
     </div>
 </div>

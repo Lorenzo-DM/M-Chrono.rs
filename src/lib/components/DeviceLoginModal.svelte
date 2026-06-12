@@ -4,6 +4,7 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
   import type { DeviceCodeResponse } from '../types';
+  import Button from '../ui/Button.svelte';
 
   let { onClose }: { onClose: (success: boolean) => void } = $props();
   let resp = $state<DeviceCodeResponse | null>(null);
@@ -56,7 +57,7 @@
   <div class="panel-2 w-full max-w-xl">
     <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
       <div class="hud-strong" style="color: var(--accent-running)">ACCEDI VIA BROWSER</div>
-      <button class="btn-base btn-ghost text-xs" onclick={() => onClose(false)}>ESC</button>
+      <Button variant="ghost" size="sm" onclick={() => onClose(false)}>ESC</Button>
     </div>
 
     <div class="p-6">
@@ -93,7 +94,7 @@
         <div class="hud mt-1" style="color: var(--fg-3)">in attesa di conferma…</div>
       {/if}
 
-      <button class="btn-base mt-6 w-full py-3" onclick={() => onClose(false)}>ANNULLA</button>
+      <Button class="mt-6 w-full py-3" onclick={() => onClose(false)}>ANNULLA</Button>
     </div>
   </div>
 </div>

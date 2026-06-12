@@ -22,27 +22,87 @@
 // does not matter — the mock auto-succeeds on the SECOND poll regardless.
 
 type Course = {
-  id: number; name: string; distance_m: number | null;
-  started_at_ms: number | null; scheduled_at_ms: number | null;
+  id: number;
+  name: string;
+  distance_m: number | null;
+  started_at_ms: number | null;
+  scheduled_at_ms: number | null;
 };
 type Athlete = {
-  id: number; bib_number: number; first_name: string; last_name: string; course_id: number;
+  id: number;
+  bib_number: number;
+  first_name: string;
+  last_name: string;
+  course_id: number;
 };
 
 const COURSES: Course[] = [
-  { id: 1, name: "21K", distance_m: 21_000, started_at_ms: null, scheduled_at_ms: null },
-  { id: 2, name: "42K", distance_m: 42_000, started_at_ms: null, scheduled_at_ms: null },
+  {
+    id: 1,
+    name: "21K",
+    distance_m: 21_000,
+    started_at_ms: null,
+    scheduled_at_ms: null,
+  },
+  {
+    id: 2,
+    name: "42K",
+    distance_m: 42_000,
+    started_at_ms: null,
+    scheduled_at_ms: null,
+  },
+  {
+    id: 3,
+    name: "62K",
+    distance_m: 46_000,
+    started_at_ms: null,
+    scheduled_at_ms: null,
+  },
 ];
 
 const FIRST_NAMES = [
-  "Mario", "Luigi", "Giulia", "Anna", "Marco", "Luca", "Sara", "Elena",
-  "Paolo", "Chiara", "Andrea", "Francesca", "Giovanni", "Alessia",
-  "Stefano", "Martina", "Davide", "Federica", "Roberto", "Valentina",
+  "Mario",
+  "Luigi",
+  "Giulia",
+  "Anna",
+  "Marco",
+  "Luca",
+  "Sara",
+  "Elena",
+  "Paolo",
+  "Chiara",
+  "Andrea",
+  "Francesca",
+  "Giovanni",
+  "Alessia",
+  "Stefano",
+  "Martina",
+  "Davide",
+  "Federica",
+  "Roberto",
+  "Valentina",
 ];
 const LAST_NAMES = [
-  "Rossi", "Bianchi", "Romano", "Ricci", "Marino", "Greco", "Bruno",
-  "Gallo", "Conti", "De Luca", "Mancini", "Costa", "Giordano", "Rizzo",
-  "Lombardi", "Moretti", "Barbieri", "Fontana", "Santoro", "Mariani",
+  "Rossi",
+  "Bianchi",
+  "Romano",
+  "Ricci",
+  "Marino",
+  "Greco",
+  "Bruno",
+  "Gallo",
+  "Conti",
+  "De Luca",
+  "Mancini",
+  "Costa",
+  "Giordano",
+  "Rizzo",
+  "Lombardi",
+  "Moretti",
+  "Barbieri",
+  "Fontana",
+  "Santoro",
+  "Mariani",
 ];
 
 const ATHLETES: Athlete[] = Array.from({ length: 60 }, (_, i): Athlete => {
@@ -53,7 +113,7 @@ const ATHLETES: Athlete[] = Array.from({ length: 60 }, (_, i): Athlete => {
     bib_number: bib,
     first_name: FIRST_NAMES[i % FIRST_NAMES.length],
     last_name: LAST_NAMES[(i * 7) % LAST_NAMES.length],
-    course_id: i < 30 ? 1 : 2,
+    course_id: Math.ceil(Math.random() * (1 - 4) + 3),
   };
 });
 
@@ -101,7 +161,8 @@ const server = Bun.serve({
         device_code,
         user_code: "ABCD-1234",
         verification_uri: "http://localhost:8787/verify",
-        verification_uri_complete: "http://localhost:8787/verify?code=ABCD-1234",
+        verification_uri_complete:
+          "http://localhost:8787/verify?code=ABCD-1234",
         expires_in: 600,
         interval: 2,
         scope: form["scope"] ?? "",
@@ -167,14 +228,20 @@ const server = Bun.serve({
     }
 
     if (method === "POST" && path === "/timings/batch") {
-      const body = await req.json() as Array<{ local_id: number }>;
-      const acks = body.map(t => ({ local_id: t.local_id, remote_id: NEXT_REMOTE_ID++ }));
+      const body = (await req.json()) as Array<{ local_id: number }>;
+      const acks = body.map((t) => ({
+        local_id: t.local_id,
+        remote_id: NEXT_REMOTE_ID++,
+      }));
       return json(200, acks);
     }
 
     if (method === "POST" && path === "/pending_finishes/batch") {
-      const body = await req.json() as Array<{ local_id: number }>;
-      const acks = body.map(p => ({ local_id: p.local_id, remote_id: NEXT_REMOTE_ID++ }));
+      const body = (await req.json()) as Array<{ local_id: number }>;
+      const acks = body.map((p) => ({
+        local_id: p.local_id,
+        remote_id: NEXT_REMOTE_ID++,
+      }));
       return json(200, acks);
     }
 

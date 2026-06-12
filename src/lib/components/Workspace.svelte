@@ -1,17 +1,20 @@
 <script lang="ts">
+  import { breakpoint } from '../breakpoint';
   import { courses, layoutMode, activeCourseId, visibleLanes } from '../stores';
   import LaneCard from './LaneCard.svelte';
   import type { Course } from '../types';
+
+  let effectiveLayout = $derived.by(() => ($breakpoint === 'mobile' ? 'tabs' : $layoutMode));
 
   // Pick which courses to show based on layout mode
   let visibleCourses = $derived.by<Course[]>(() => {
     const all = $courses;
     if (all.length === 0) return [];
-    if ($layoutMode === 'tabs') {
+    if (effectiveLayout === 'tabs') {
       const active = all.find(c => c.id === $activeCourseId) ?? all[0];
       return [active];
     }
-    if ($layoutMode === 'grid') return all;
+    if (effectiveLayout === 'grid') return all;
     // split
     const chosen = $visibleLanes
       .map(id => all.find(c => c.id === id))
@@ -29,8 +32,8 @@
   });
 
   function gridClass() {
-    if ($layoutMode === 'tabs') return 'grid-cols-1';
-    if ($layoutMode === 'split') {
+    if (effectiveLayout === 'tabs') return 'grid-cols-1';
+    if (effectiveLayout === 'split') {
       const n = visibleCourses.length;
       return n >= 3 ? 'grid-cols-3' : 'grid-cols-2';
     }
@@ -42,7 +45,7 @@
   }
 
   function toggleSplitCourse(courseId: number) {
-    if ($layoutMode !== 'split') return;
+    if (effectiveLayout !== 'split') return;
     visibleLanes.update(arr => {
       if (arr.includes(courseId)) {
         return arr.filter(id => id !== courseId);
@@ -54,7 +57,7 @@
 
 <div class="h-full flex flex-col">
   <!-- Tab strip (tabs mode) or split-lane picker (split mode) -->
-  {#if $layoutMode === 'tabs'}
+  {#if effectiveLayout === 'tabs'}
     <div class="tab-strip overflow-x-auto">
       {#each $courses as c (c.id)}
         <button
@@ -69,7 +72,7 @@
         </button>
       {/each}
     </div>
-  {:else if $layoutMode === 'split'}
+  {:else if effectiveLayout === 'split'}
     <div class="flex items-center gap-2 px-4 py-2 border-b" style="border-color: var(--line-2)">
       <div class="hud">CORSIE VISIBILI</div>
       {#each $courses as c (c.id)}
