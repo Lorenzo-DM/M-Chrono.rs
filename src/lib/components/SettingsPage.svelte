@@ -8,6 +8,7 @@
     import DeviceLoginModal from "./DeviceLoginModal.svelte";
     import AthleteImportPanel from "./AthleteImportPanel.svelte";
     import AthleteFormModal from "./AthleteFormModal.svelte";
+    import RaceSetupPanel from "./RaceSetupPanel.svelte";
     import { save as saveDialog } from "@tauri-apps/plugin-dialog";
     import type { AppConfig, Athlete } from "../types";
 
@@ -190,6 +191,12 @@
                 value={$themeMode}
                 onChange={(v) => themeMode.set(v as ThemeMode)}
             />
+        </section>
+
+        <!-- Race + courses -->
+        <section class="panel p-4 col-span-12">
+            <div class="hud mb-4">GARA / PERCORSI</div>
+            <RaceSetupPanel />
         </section>
 
         <!-- Athletes -->

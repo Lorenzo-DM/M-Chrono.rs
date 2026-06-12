@@ -3,18 +3,20 @@
   import { config } from '../stores';
   import Button from '../ui/Button.svelte';
   import AthleteImportPanel from './AthleteImportPanel.svelte';
+  import RaceSetupPanel from './RaceSetupPanel.svelte';
 
   let { onReady }: { onReady: () => void } = $props();
 
-  // Steps: 0 operator, 1 athletes
+  // Steps: 0 operator, 1 race+courses, 2 athletes
   let step = $state(0);
   let operatorId = $state($config?.operator_id ?? '');
   let saving = $state(false);
   let error = $state<string | null>(null);
   let imported = $state(false);
+  let raceConfigured = $state(false);
 
-  const stepCount = 2;
-  const stepLabels = ['OPERATORE', 'ATLETI'];
+  const stepCount = 3;
+  const stepLabels = ['OPERATORE', 'GARA', 'ATLETI'];
 
   async function nextStep() {
     if (step === 0) {
@@ -31,6 +33,10 @@
       } catch (e: any) {
         error = e?.message ?? JSON.stringify(e);
       } finally { saving = false; }
+      return;
+    }
+    if (step === 1) {
+      step = 2;
       return;
     }
     onReady();
@@ -98,9 +104,25 @@
           </label>
         </section>
 
+      {:else if step === 1}
+        <section class="reveal">
+          <div class="hud" style="color: var(--fg-3)">PASSAGGIO 02 / 03</div>
+          <h2 class="text-3xl font-semibold mt-2" style="color: var(--fg-0); letter-spacing: -0.01em">
+            Crea la gara e i percorsi
+          </h2>
+          <p class="mt-3 max-w-xl" style="color: var(--fg-2)">
+            Dai un nome alla gara e aggiungi i percorsi (es. 21K, 10K).
+            Puoi saltare e configurarli dopo dalle impostazioni.
+          </p>
+
+          <div class="mt-8">
+            <RaceSetupPanel onChange={() => (raceConfigured = true)} />
+          </div>
+        </section>
+
       {:else}
         <section class="reveal">
-          <div class="hud" style="color: var(--fg-3)">PASSAGGIO 02 / 02</div>
+          <div class="hud" style="color: var(--fg-3)">PASSAGGIO 03 / 03</div>
           <h2 class="text-3xl font-semibold mt-2" style="color: var(--fg-0); letter-spacing: -0.01em">
             Importa gli atleti
           </h2>
@@ -126,18 +148,23 @@
           style="border-color: var(--line-2); background: var(--bg-1)">
     <div>
       {#if step > 0}
-        <Button variant="ghost" onclick={() => (step = 0)}>← INDIETRO</Button>
+        <Button variant="ghost" onclick={() => (step -= 1)}>← INDIETRO</Button>
       {/if}
     </div>
 
     <div class="flex items-center gap-3">
-      {#if step === 1 && !imported}
+      {#if step === 1 && !raceConfigured}
+        <Button variant="ghost" onclick={() => (step = 2)} title="Configura la gara più tardi dalle impostazioni">
+          SALTA — CONFIGURA PIÙ TARDI
+        </Button>
+      {/if}
+      {#if step === 2 && !imported}
         <Button variant="ghost" onclick={onReady} title="Importa più tardi dalle impostazioni">
           SALTA — IMPORTA PIÙ TARDI
         </Button>
       {/if}
       <Button variant="primary" class="px-6 py-3" disabled={saving} onclick={nextStep}>
-        {#if step === 1}
+        {#if step === 2}
           AVVIA WORKSPACE →
         {:else}
           AVANTI →

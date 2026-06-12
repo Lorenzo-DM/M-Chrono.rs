@@ -1,6 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Race {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub scheduled_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Course {
     pub id: i64,
     pub name: String,
@@ -9,6 +17,9 @@ pub struct Course {
     pub scheduled_at_ms: Option<i64>,
     #[serde(default)]
     pub ended_at_ms: Option<i64>,
+    // Local-only link to a race; backend courses omit it (serde default = None).
+    #[serde(default)]
+    pub race_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

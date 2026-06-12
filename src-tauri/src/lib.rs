@@ -128,6 +128,11 @@ pub fn run() {
             commands::save_athlete,
             commands::delete_athlete,
             commands::get_all_athletes,
+            commands::get_races,
+            commands::save_race,
+            commands::delete_race,
+            commands::save_course,
+            commands::delete_course,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

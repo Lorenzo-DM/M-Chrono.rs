@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   Course, Timing, PendingFinish, AthleteRow, DisplaySnapshot,
   AppConfig, DeviceCodeResponse, Athlete, AthleteInput, ImportSummary,
+  Race, RaceInput, CourseInput,
 } from './types';
 
 export const api = {
@@ -45,6 +46,13 @@ export const api = {
     invoke<Athlete>('save_athlete', { id, input }),
   deleteAthlete: (id: number) => invoke<void>('delete_athlete', { id }),
   getAllAthletes: () => invoke<Athlete[]>('get_all_athletes'),
+  getRaces: () => invoke<Race[]>('get_races'),
+  saveRace: (id: number | null, input: RaceInput) =>
+    invoke<Race>('save_race', { id, input }),
+  deleteRace: (id: number) => invoke<void>('delete_race', { id }),
+  saveCourse: (id: number | null, input: CourseInput) =>
+    invoke<Course>('save_course', { id, input }),
+  deleteCourse: (id: number) => invoke<void>('delete_course', { id }),
   getDuplicateGroups: () => invoke<any[]>('get_duplicate_groups'),
   exportResultsXlsx: (path: string) =>
     invoke<{ path: string; courses_count: number; athletes_count: number }>(

@@ -1,5 +1,5 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{Athlete, Course, PendingFinish, Timing, TimingStatus};
+use crate::models::{Athlete, Course, PendingFinish, Race, Timing, TimingStatus};
 use crate::timer::clock::{ClockProvider, SystemClock};
 use rusqlite::{params, Connection};
 use std::sync::{Arc, Mutex};
@@ -53,16 +53,101 @@ impl Repo {
 
     pub fn upsert_course(&self, c: &Course) -> AppResult<()> {
         let now = self.clock.now_ms();
+        // On conflict, race_id is preserved (not from `excluded`): backend
+        // sync sends race_id = NULL and must not wipe a local race link.
         self.lock().execute(
             "INSERT INTO courses(id, name, distance_m, started_at_ms, scheduled_at_ms,
-                                 created_at_ms, updated_at_ms)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?6)
+                                 race_id, created_at_ms, updated_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  distance_m = excluded.distance_m,
                  updated_at_ms = excluded.updated_at_ms",
-            params![c.id, c.name, c.distance_m, c.started_at_ms, c.scheduled_at_ms, now],
+            params![c.id, c.name, c.distance_m, c.started_at_ms, c.scheduled_at_ms,
+                    c.race_id, now],
         )?;
+        Ok(())
+    }
+
+    // ---- Races -------------------------------------------------------------
+
+    pub fn next_local_race_id(&self) -> AppResult<i64> {
+        let min: i64 = self.lock().query_row(
+            "SELECT COALESCE(MIN(id), 0) FROM races", [], |r| r.get(0),
+        )?;
+        Ok(min.min(0) - 1)
+    }
+
+    pub fn upsert_race(&self, race: &Race) -> AppResult<()> {
+        let now = self.clock.now_ms();
+        self.lock().execute(
+            "INSERT INTO races(id, name, scheduled_at_ms, created_at_ms, updated_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?4)
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 scheduled_at_ms = excluded.scheduled_at_ms,
+                 updated_at_ms = excluded.updated_at_ms",
+            params![race.id, race.name, race.scheduled_at_ms, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_races(&self) -> AppResult<Vec<Race>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, scheduled_at_ms FROM races ORDER BY id"
+        )?;
+        let rows = stmt.query_map([], |r| Ok(Race {
+            id: r.get(0)?, name: r.get(1)?, scheduled_at_ms: r.get(2)?,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    /// Delete a race; its courses are orphaned (race_id set to NULL) so their
+    /// athletes and timings stay intact.
+    pub fn delete_race(&self, id: i64) -> AppResult<()> {
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        tx.execute("UPDATE courses SET race_id = NULL WHERE race_id = ?1", params![id])?;
+        let n = tx.execute("DELETE FROM races WHERE id = ?1", params![id])?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("race {}", id)));
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    // ---- Local course management ------------------------------------------
+
+    pub fn update_course(&self, id: i64, name: &str, race_id: Option<i64>) -> AppResult<()> {
+        let now = self.clock.now_ms();
+        let n = self.lock().execute(
+            "UPDATE courses SET name = ?1, race_id = ?2, updated_at_ms = ?3 WHERE id = ?4",
+            params![name, race_id, now, id],
+        )?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("course {}", id)));
+        }
+        Ok(())
+    }
+
+    pub fn delete_course(&self, id: i64) -> AppResult<()> {
+        let conn = self.lock();
+        let athletes: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM athletes WHERE course_id = ?1", params![id], |r| r.get(0),
+        )?;
+        let timings: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM timings WHERE course_id = ?1", params![id], |r| r.get(0),
+        )?;
+        if athletes > 0 || timings > 0 {
+            return Err(AppError::InvalidState(
+                "percorso con atleti o tempi: impossibile eliminarlo".into()
+            ));
+        }
+        let n = conn.execute("DELETE FROM courses WHERE id = ?1", params![id])?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("course {}", id)));
+        }
         Ok(())
     }
 
@@ -102,7 +187,7 @@ impl Repo {
     pub fn find_course_by_name(&self, name: &str) -> AppResult<Option<Course>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms
+            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms, race_id
              FROM courses WHERE LOWER(TRIM(name)) = LOWER(TRIM(?1)) LIMIT 1"
         )?;
         let mut rows = stmt.query(params![name])?;
@@ -110,7 +195,7 @@ impl Repo {
             Some(r) => Ok(Some(Course {
                 id: r.get(0)?, name: r.get(1)?, distance_m: r.get(2)?,
                 started_at_ms: r.get(3)?, scheduled_at_ms: r.get(4)?,
-                ended_at_ms: r.get(5)?,
+                ended_at_ms: r.get(5)?, race_id: r.get(6)?,
             })),
             None => Ok(None),
         }
@@ -153,13 +238,13 @@ impl Repo {
     pub fn list_courses(&self) -> AppResult<Vec<Course>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms
+            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms, race_id
              FROM courses ORDER BY id"
         )?;
         let rows = stmt.query_map([], |r| Ok(Course {
             id: r.get(0)?, name: r.get(1)?, distance_m: r.get(2)?,
             started_at_ms: r.get(3)?, scheduled_at_ms: r.get(4)?,
-            ended_at_ms: r.get(5)?,
+            ended_at_ms: r.get(5)?, race_id: r.get(6)?,
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
     }
@@ -670,7 +755,7 @@ mod tests {
     fn upsert_course_inserts_then_updates() {
         let r = fresh();
         let mut c = Course { id: 1, name: "21K".into(), distance_m: Some(21_000),
-                             started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None };
+                             started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None };
         r.upsert_course(&c).unwrap();
         c.name = "21K Trail".into();
         r.upsert_course(&c).unwrap();
@@ -684,7 +769,7 @@ mod tests {
         let r = fresh();
         r.upsert_course(&Course {
             id: 1, name: "21K".into(), distance_m: None,
-            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
         }).unwrap();
         r.upsert_athlete(&Athlete {
             id: 100, bib_number: 7, first_name: "Mario".into(),
@@ -699,7 +784,7 @@ mod tests {
     fn insert_running_and_finish_updates_total() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         let tid = r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
@@ -714,7 +799,7 @@ mod tests {
     fn pending_finish_lifecycle() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         let p = r.insert_pending_finish(1, 12345, "PC-A").unwrap();
         assert!(r.list_pending_open(1).unwrap().len() == 1);
         r.mark_pending_assigned(p.id).unwrap();
@@ -725,7 +810,7 @@ mod tests {
     fn find_running_timing_returns_correct_athlete() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
@@ -738,7 +823,7 @@ mod tests {
     fn unsynced_query_excludes_synced_rows() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         let t1 = r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
@@ -763,11 +848,11 @@ mod tests {
         let r = fresh();
         assert_eq!(r.next_local_course_id().unwrap(), -1);
         r.upsert_course(&Course { id: -1, name: "Locale".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         assert_eq!(r.next_local_course_id().unwrap(), -2);
         // backend ids (positive) don't affect the local space
         r.upsert_course(&Course { id: 100, name: "Remota".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         assert_eq!(r.next_local_course_id().unwrap(), -2);
         assert_eq!(r.next_local_athlete_id().unwrap(), -1);
     }
@@ -776,7 +861,7 @@ mod tests {
     fn find_course_by_name_is_case_insensitive_and_trimmed() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "21K Trail".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         assert!(r.find_course_by_name("  21k trail ").unwrap().is_some());
         assert!(r.find_course_by_name("10K").unwrap().is_none());
     }
@@ -785,7 +870,7 @@ mod tests {
     fn delete_athlete_rejected_when_timings_exist() {
         let r = fresh();
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: 1 }).unwrap();
         r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
@@ -800,7 +885,7 @@ mod tests {
     fn unsynced_queries_exclude_local_id_rows() {
         let r = fresh();
         r.upsert_course(&Course { id: -1, name: "Locale".into(), distance_m: None,
-                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: -1, bib_number: 1, first_name: "a".into(),
                                      last_name: "b".into(), course_id: -1 }).unwrap();
         let t = r.insert_timing_running(-1, -1, 100, "PC-A").unwrap();
@@ -808,6 +893,59 @@ mod tests {
         assert!(r.fetch_unsynced_timings(10).unwrap().is_empty());
         r.insert_pending_finish(-1, 123, "PC-A").unwrap();
         assert!(r.fetch_unsynced_pending(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn race_crud_and_delete_orphans_courses() {
+        let r = fresh();
+        assert_eq!(r.next_local_race_id().unwrap(), -1);
+        r.upsert_race(&Race { id: -1, name: "Gara Domenica".into(), scheduled_at_ms: Some(123) }).unwrap();
+        assert_eq!(r.next_local_race_id().unwrap(), -2);
+        let races = r.list_races().unwrap();
+        assert_eq!(races.len(), 1);
+        assert_eq!(races[0].name, "Gara Domenica");
+
+        r.upsert_course(&Course { id: -1, name: "21K".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: Some(-1) }).unwrap();
+        // delete race orphans the course but keeps it
+        r.delete_race(-1).unwrap();
+        assert!(r.list_races().unwrap().is_empty());
+        let courses = r.list_courses().unwrap();
+        assert_eq!(courses.len(), 1);
+        assert_eq!(courses[0].race_id, None);
+    }
+
+    #[test]
+    fn course_update_and_delete_guard() {
+        let r = fresh();
+        r.upsert_race(&Race { id: -5, name: "G".into(), scheduled_at_ms: None }).unwrap();
+        r.upsert_course(&Course { id: -1, name: "Vecchio".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+        r.update_course(-1, "Nuovo", Some(-5)).unwrap();
+        let c = r.list_courses().unwrap();
+        assert_eq!(c[0].name, "Nuovo");
+        assert_eq!(c[0].race_id, Some(-5));
+        // delete blocked when athletes reference it
+        r.upsert_athlete(&Athlete { id: -1, bib_number: 1, first_name: "a".into(),
+            last_name: "b".into(), course_id: -1 }).unwrap();
+        assert!(r.delete_course(-1).is_err());
+        r.delete_athlete(-1).unwrap();
+        r.delete_course(-1).unwrap();
+        assert!(r.list_courses().unwrap().is_empty());
+    }
+
+    #[test]
+    fn backend_upsert_preserves_local_race_link() {
+        let r = fresh();
+        r.upsert_race(&Race { id: -1, name: "G".into(), scheduled_at_ms: None }).unwrap();
+        r.upsert_course(&Course { id: 100, name: "21K".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: Some(-1) }).unwrap();
+        // simulate a backend re-fetch: same id, race_id None
+        r.upsert_course(&Course { id: 100, name: "21K Trail".into(), distance_m: Some(21000),
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+        let c = r.list_courses().unwrap();
+        assert_eq!(c[0].name, "21K Trail");
+        assert_eq!(c[0].race_id, Some(-1)); // preserved
     }
 
     #[test]

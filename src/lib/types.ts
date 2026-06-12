@@ -1,5 +1,11 @@
 export type TimingStatus = 'Registered' | 'Running' | 'Finished' | 'Withdrawn';
 
+export interface Race {
+  id: number;
+  name: string;
+  scheduled_at_ms: number | null;
+}
+
 export interface Course {
   id: number;
   name: string;
@@ -7,6 +13,17 @@ export interface Course {
   started_at_ms: number | null;
   scheduled_at_ms: number | null;
   ended_at_ms: number | null;
+  race_id: number | null;
+}
+
+export interface RaceInput {
+  name: string;
+  scheduled_at_ms: number | null;
+}
+
+export interface CourseInput {
+  name: string;
+  race_id: number | null;
 }
 
 export interface Athlete {

@@ -378,7 +378,7 @@ mod tests {
         let clock = Arc::new(MockClock::new(1_000_000));
         let repo = Arc::new(Repo::with_clock(db.conn.clone(), clock.clone()));
         repo.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         for i in 1..=3 {
             repo.upsert_athlete(&Athlete {
                 id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1

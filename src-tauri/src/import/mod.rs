@@ -188,7 +188,7 @@ pub fn get_or_create_course(repo: &Repo, name: &str) -> AppResult<(i64, bool)> {
         distance_m: None,
         started_at_ms: None,
         scheduled_at_ms: None,
-        ended_at_ms: None,
+        ended_at_ms: None, race_id: None,
     })?;
     Ok((id, true))
 }
@@ -295,7 +295,7 @@ mod tests {
         let r = fresh();
         r.upsert_course(&Course {
             id: 5, name: "21K".into(), distance_m: None,
-            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
         }).unwrap();
         let s = apply_rows(&r, vec![row(1, 1, "Mario", "Rossi", "  21k ")]).unwrap();
         assert_eq!(s.courses_created, 0);
@@ -307,7 +307,7 @@ mod tests {
         let r = fresh();
         r.upsert_course(&Course {
             id: 5, name: "21K".into(), distance_m: None,
-            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
         }).unwrap();
         r.upsert_athlete(&Athlete {
             id: 100, bib_number: 7, first_name: "Old".into(),

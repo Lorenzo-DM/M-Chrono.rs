@@ -1,6 +1,6 @@
 use crate::app_ctx::AppCtx;
 use crate::error::AppError;
-use crate::models::{Athlete, Course, DeviceCodeResponse, PendingFinish, Timing};
+use crate::models::{Athlete, Course, DeviceCodeResponse, PendingFinish, Race, Timing};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
@@ -343,6 +343,110 @@ pub async fn fetch_remote_data(ctx: State<'_, AppCtx>) -> Result<FetchSummary, A
 async fn refresh_state(ctx: &AppCtx) -> Result<(), AppError> {
     let snap = crate::state::bootstrap_from_db(&ctx.repo, &*ctx.clock)?;
     *ctx.state.write().await = snap;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_races(ctx: State<'_, AppCtx>) -> Result<Vec<Race>, AppError> {
+    ctx.repo.list_races()
+}
+
+#[derive(serde::Deserialize)]
+pub struct RaceInput {
+    pub name: String,
+    pub scheduled_at_ms: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn save_race(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: RaceInput,
+) -> Result<Race, AppError> {
+    let name = input.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::InvalidState("nome gara obbligatorio".into()));
+    }
+    let race = Race {
+        id: match id {
+            Some(v) => v,
+            None => ctx.repo.next_local_race_id()?,
+        },
+        name,
+        scheduled_at_ms: input.scheduled_at_ms,
+    };
+    ctx.repo.upsert_race(&race)?;
+    let _ = app.emit("data:changed", ());
+    Ok(race)
+}
+
+#[tauri::command]
+pub async fn delete_race(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_race(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+pub struct CourseInput {
+    pub name: String,
+    pub race_id: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn save_course(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: CourseInput,
+) -> Result<Course, AppError> {
+    let name = input.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::InvalidState("nome percorso obbligatorio".into()));
+    }
+    let course = match id {
+        Some(cid) => {
+            ctx.repo.update_course(cid, &name, input.race_id)?;
+            ctx.repo
+                .list_courses()?
+                .into_iter()
+                .find(|c| c.id == cid)
+                .ok_or_else(|| AppError::NotFound(format!("course {}", cid)))?
+        }
+        None => {
+            let course = Course {
+                id: ctx.repo.next_local_course_id()?,
+                name,
+                distance_m: None,
+                started_at_ms: None,
+                scheduled_at_ms: None,
+                ended_at_ms: None,
+                race_id: input.race_id,
+            };
+            ctx.repo.upsert_course(&course)?;
+            course
+        }
+    };
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(course)
+}
+
+#[tauri::command]
+pub async fn delete_course(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_course(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
     Ok(())
 }
 
