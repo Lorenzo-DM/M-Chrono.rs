@@ -252,6 +252,7 @@ pub struct ConfigPatch {
     pub operator_id: Option<String>,
     pub dedup_window_ms: Option<i64>,
     pub dedup_warn_delta_ms: Option<i64>,
+    pub sync_enabled: Option<bool>,
 }
 
 #[tauri::command]
@@ -268,6 +269,7 @@ pub async fn update_config(
     if let Some(v) = patch.operator_id       { cfg.operator_id = v; }
     if let Some(v) = patch.dedup_window_ms   { cfg.dedup_window_ms = v; }
     if let Some(v) = patch.dedup_warn_delta_ms { cfg.dedup_warn_delta_ms = v; }
+    if let Some(v) = patch.sync_enabled        { cfg.sync_enabled = v; }
     cfg.save(&ctx.config_path)?;
     Ok(cfg.clone())
 }
@@ -336,6 +338,103 @@ pub async fn fetch_remote_data(ctx: State<'_, AppCtx>) -> Result<FetchSummary, A
         courses_count: courses.len(),
         athletes_count: athletes.len(),
     })
+}
+
+async fn refresh_state(ctx: &AppCtx) -> Result<(), AppError> {
+    let snap = crate::state::bootstrap_from_db(&ctx.repo, &*ctx.clock)?;
+    *ctx.state.write().await = snap;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn import_athletes_file(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    path: String,
+) -> Result<crate::import::ImportSummary, AppError> {
+    let repo = ctx.repo.clone();
+    let p = std::path::PathBuf::from(path);
+    let summary = tokio::task::spawn_blocking(move || crate::import::import_file(&repo, &p))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(summary)
+}
+
+#[derive(serde::Deserialize)]
+pub struct AthleteInput {
+    pub bib_number: i64,
+    pub first_name: String,
+    pub last_name: String,
+    pub course_id: Option<i64>,
+    pub course_name: Option<String>,
+}
+
+#[tauri::command]
+pub async fn save_athlete(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: AthleteInput,
+) -> Result<Athlete, AppError> {
+    if input.bib_number <= 0 {
+        return Err(AppError::InvalidState("pettorale deve essere positivo".into()));
+    }
+    let first = input.first_name.trim().to_string();
+    let last = input.last_name.trim().to_string();
+    if first.is_empty() && last.is_empty() {
+        return Err(AppError::InvalidState("nome e cognome mancanti".into()));
+    }
+
+    let course_id = match (input.course_id, input.course_name.as_deref()) {
+        (Some(cid), _) => cid,
+        (None, Some(name)) if !name.trim().is_empty() => {
+            crate::import::get_or_create_course(&ctx.repo, name)?.0
+        }
+        _ => return Err(AppError::InvalidState("percorso mancante".into())),
+    };
+
+    if let Some(existing) = ctx.repo.find_athlete_by_bib(input.bib_number)? {
+        if Some(existing.id) != id {
+            return Err(AppError::InvalidState(format!(
+                "pettorale {} già assegnato a {} {}",
+                input.bib_number, existing.first_name, existing.last_name
+            )));
+        }
+    }
+
+    let athlete = Athlete {
+        id: match id {
+            Some(v) => v,
+            None => ctx.repo.next_local_athlete_id()?,
+        },
+        bib_number: input.bib_number,
+        first_name: first,
+        last_name: last,
+        course_id,
+    };
+    ctx.repo.upsert_athlete(&athlete)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(athlete)
+}
+
+#[tauri::command]
+pub async fn delete_athlete(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_athlete(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_all_athletes(ctx: State<'_, AppCtx>) -> Result<Vec<Athlete>, AppError> {
+    ctx.repo.list_athletes()
 }
 
 #[tauri::command]

@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type {
   Course, Timing, PendingFinish, AthleteRow, DisplaySnapshot,
-  AppConfig, DeviceCodeResponse,
+  AppConfig, DeviceCodeResponse, Athlete, AthleteInput, ImportSummary,
 } from './types';
 
 export const api = {
@@ -39,6 +39,12 @@ export const api = {
   isAuthenticated: () => invoke<boolean>('is_authenticated'),
   logout: () => invoke<void>('logout'),
   fetchRemoteData: () => invoke<{ courses_count: number; athletes_count: number }>('fetch_remote_data'),
+  importAthletesFile: (path: string) =>
+    invoke<ImportSummary>('import_athletes_file', { path }),
+  saveAthlete: (id: number | null, input: AthleteInput) =>
+    invoke<Athlete>('save_athlete', { id, input }),
+  deleteAthlete: (id: number) => invoke<void>('delete_athlete', { id }),
+  getAllAthletes: () => invoke<Athlete[]>('get_all_athletes'),
   getDuplicateGroups: () => invoke<any[]>('get_duplicate_groups'),
   exportResultsXlsx: (path: string) =>
     invoke<{ path: string; courses_count: number; athletes_count: number }>(

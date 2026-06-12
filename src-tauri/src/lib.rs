@@ -11,6 +11,7 @@ mod sync;
 mod api;
 mod auth;
 mod export;
+mod import;
 mod app_ctx;
 
 use crate::app_ctx::AppCtx;
@@ -123,6 +124,10 @@ pub fn run() {
             commands::fetch_remote_data,
             commands::get_duplicate_groups,
             commands::export_results_xlsx,
+            commands::import_athletes_file,
+            commands::save_athlete,
+            commands::delete_athlete,
+            commands::get_all_athletes,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

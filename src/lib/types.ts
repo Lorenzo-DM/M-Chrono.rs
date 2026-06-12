@@ -87,4 +87,25 @@ export interface AppConfig {
   operator_id: string;
   dedup_window_ms: number;
   dedup_warn_delta_ms: number;
+  sync_enabled: boolean;
+}
+
+export interface ImportRowError {
+  row: number;
+  message: string;
+}
+
+export interface ImportSummary {
+  inserted: number;
+  updated: number;
+  courses_created: number;
+  errors: ImportRowError[];
+}
+
+export interface AthleteInput {
+  bib_number: number;
+  first_name: string;
+  last_name: string;
+  course_id: number | null;
+  course_name: string | null;
 }

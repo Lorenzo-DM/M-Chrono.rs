@@ -83,6 +83,73 @@ impl Repo {
         Ok(())
     }
 
+    /// Locally created entities use negative ids: backend ids are positive,
+    /// so the two spaces never collide and `id < 0` doubles as "is local".
+    pub fn next_local_course_id(&self) -> AppResult<i64> {
+        let min: i64 = self.lock().query_row(
+            "SELECT COALESCE(MIN(id), 0) FROM courses", [], |r| r.get(0),
+        )?;
+        Ok(min.min(0) - 1)
+    }
+
+    pub fn next_local_athlete_id(&self) -> AppResult<i64> {
+        let min: i64 = self.lock().query_row(
+            "SELECT COALESCE(MIN(id), 0) FROM athletes", [], |r| r.get(0),
+        )?;
+        Ok(min.min(0) - 1)
+    }
+
+    pub fn find_course_by_name(&self, name: &str) -> AppResult<Option<Course>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, distance_m, started_at_ms, scheduled_at_ms, ended_at_ms
+             FROM courses WHERE LOWER(TRIM(name)) = LOWER(TRIM(?1)) LIMIT 1"
+        )?;
+        let mut rows = stmt.query(params![name])?;
+        match rows.next()? {
+            Some(r) => Ok(Some(Course {
+                id: r.get(0)?, name: r.get(1)?, distance_m: r.get(2)?,
+                started_at_ms: r.get(3)?, scheduled_at_ms: r.get(4)?,
+                ended_at_ms: r.get(5)?,
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub fn find_athlete_by_bib(&self, bib: i64) -> AppResult<Option<Athlete>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, bib_number, first_name, last_name, course_id
+             FROM athletes WHERE bib_number = ?1 LIMIT 1"
+        )?;
+        let mut rows = stmt.query(params![bib])?;
+        match rows.next()? {
+            Some(r) => Ok(Some(Athlete {
+                id: r.get(0)?, bib_number: r.get(1)?, first_name: r.get(2)?,
+                last_name: r.get(3)?, course_id: r.get(4)?,
+            })),
+            None => Ok(None),
+        }
+    }
+
+    pub fn delete_athlete(&self, id: i64) -> AppResult<()> {
+        let conn = self.lock();
+        let timings: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM timings WHERE athlete_id = ?1",
+            params![id], |r| r.get(0),
+        )?;
+        if timings > 0 {
+            return Err(AppError::InvalidState(
+                "atleta con tempi registrati: impossibile eliminarlo".into()
+            ));
+        }
+        let n = conn.execute("DELETE FROM athletes WHERE id = ?1", params![id])?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("athlete {}", id)));
+        }
+        Ok(())
+    }
+
     pub fn list_courses(&self) -> AppResult<Vec<Course>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
@@ -351,6 +418,7 @@ impl Repo {
                     duplicate_group_id, duplicate_flagged, synced
              FROM timings
              WHERE synced = 0 AND sync_attempts < 5
+               AND course_id > 0 AND (athlete_id IS NULL OR athlete_id > 0)
              ORDER BY id LIMIT ?1"
         )?;
         let rows = stmt.query_map(params![limit], Self::map_timing)?;
@@ -363,6 +431,7 @@ impl Repo {
             "SELECT id, remote_id, course_id, finish_timestamp_ms, operator_id, assigned, synced
              FROM pending_finishes
              WHERE synced = 0 AND sync_attempts < 5
+               AND course_id > 0
              ORDER BY id LIMIT ?1"
         )?;
         let rows = stmt.query_map(params![limit], |r| Ok(PendingFinish {
@@ -687,6 +756,58 @@ mod tests {
         r.update_sync_cursor("timings", 42, 1000).unwrap();
         let c2 = r.get_sync_cursor("timings").unwrap();
         assert_eq!(c2.last_seen_remote_id, 42);
+    }
+
+    #[test]
+    fn local_id_allocation_is_negative_and_decreasing() {
+        let r = fresh();
+        assert_eq!(r.next_local_course_id().unwrap(), -1);
+        r.upsert_course(&Course { id: -1, name: "Locale".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+        assert_eq!(r.next_local_course_id().unwrap(), -2);
+        // backend ids (positive) don't affect the local space
+        r.upsert_course(&Course { id: 100, name: "Remota".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+        assert_eq!(r.next_local_course_id().unwrap(), -2);
+        assert_eq!(r.next_local_athlete_id().unwrap(), -1);
+    }
+
+    #[test]
+    fn find_course_by_name_is_case_insensitive_and_trimmed() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "21K Trail".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+        assert!(r.find_course_by_name("  21k trail ").unwrap().is_some());
+        assert!(r.find_course_by_name("10K").unwrap().is_none());
+    }
+
+    #[test]
+    fn delete_athlete_rejected_when_timings_exist() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
+                                     last_name: "b".into(), course_id: 1 }).unwrap();
+        r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
+        assert!(r.delete_athlete(1).is_err());
+        r.upsert_athlete(&Athlete { id: 2, bib_number: 2, first_name: "c".into(),
+                                     last_name: "d".into(), course_id: 1 }).unwrap();
+        r.delete_athlete(2).unwrap();
+        assert_eq!(r.list_athletes().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn unsynced_queries_exclude_local_id_rows() {
+        let r = fresh();
+        r.upsert_course(&Course { id: -1, name: "Locale".into(), distance_m: None,
+                                   started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: -1, bib_number: 1, first_name: "a".into(),
+                                     last_name: "b".into(), course_id: -1 }).unwrap();
+        let t = r.insert_timing_running(-1, -1, 100, "PC-A").unwrap();
+        r.update_finish(t, 200, 100).unwrap();
+        assert!(r.fetch_unsynced_timings(10).unwrap().is_empty());
+        r.insert_pending_finish(-1, 123, "PC-A").unwrap();
+        assert!(r.fetch_unsynced_pending(10).unwrap().is_empty());
     }
 
     #[test]

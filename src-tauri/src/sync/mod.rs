@@ -35,6 +35,10 @@ pub fn spawn(
                 _ = sleep(Duration::from_secs(secs)) => {}
             }
             let cfg_snap = cfg.read().await.clone();
+            if !cfg_snap.sync_enabled {
+                auth_paused = false;
+                continue;
+            }
             let token = match auth.get_access_token(&cfg_snap).await {
                 Ok(t) => {
                     if auth_paused {

@@ -16,11 +16,7 @@
   let showDup = $state(false);
 
   function needsIntro(): boolean {
-    const cfg = $config;
-    if (!cfg) return true;
-    if (!cfg.operator_id?.trim()) return true;
-    if ($courses.length === 0 && !$isAuthenticated) return true;
-    return false;
+    return !$config?.operator_id?.trim();
   }
 
   onMount(() => {

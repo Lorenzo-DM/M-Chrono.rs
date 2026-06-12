@@ -85,16 +85,21 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <span
-            class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
-            style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
-          ></span>
-          <div
-            class="hud hidden sm:block"
-            style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
-          >
-            {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
-          </div>
+          {#if !$config?.sync_enabled}
+            <span class="dot-idle" style="background: var(--fg-3);"></span>
+            <div class="hud hidden sm:block" style="color: var(--fg-3)">LOCALE</div>
+          {:else}
+            <span
+              class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+              style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+            ></span>
+            <div
+              class="hud hidden sm:block"
+              style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
+            >
+              {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+            </div>
+          {/if}
         </div>
 
         <Button
@@ -144,22 +149,29 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <span
-            class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
-            style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
-          ></span>
-          <div
-            class="hud hidden lg:block"
-            style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
-          >
-            {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
-          </div>
+          {#if !$config?.sync_enabled}
+            <span class="dot-idle" style="background: var(--fg-3);"></span>
+            <div class="hud hidden lg:block" style="color: var(--fg-3)">LOCALE</div>
+          {:else}
+            <span
+              class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+              style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+            ></span>
+            <div
+              class="hud hidden lg:block"
+              style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
+            >
+              {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+            </div>
+          {/if}
         </div>
 
-        <div class="hud hidden lg:block">
-          <span style="color: var(--fg-2)">QUEUE</span>
-          <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
-        </div>
+        {#if $config?.sync_enabled}
+          <div class="hud hidden lg:block">
+            <span style="color: var(--fg-2)">QUEUE</span>
+            <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+          </div>
+        {/if}
 
         <Button
           variant="ghost"
@@ -209,10 +221,12 @@
       {/if}
 
       <div class="flex items-center gap-2 flex-wrap">
-        <div class="hud">
-          <span style="color: var(--fg-2)">QUEUE</span>
-          <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
-        </div>
+        {#if $config?.sync_enabled}
+          <div class="hud">
+            <span style="color: var(--fg-2)">QUEUE</span>
+            <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+          </div>
+        {/if}
 
         <Button
           variant="ghost"
