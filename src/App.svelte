@@ -4,7 +4,6 @@
   import { courses, config, activeCourseId, isAuthenticated, type NavView } from './lib/stores';
   import Header from './lib/components/Header.svelte';
   import Workspace from './lib/components/Workspace.svelte';
-  import PendingDock from './lib/components/PendingDock.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
   import IntroFlow from './lib/components/IntroFlow.svelte';
@@ -93,11 +92,8 @@
 
     <main class="flex-1 min-h-0 overflow-hidden">
       {#if view === 'timing'}
-        <div class="h-full min-h-0 flex">
-          <div class="flex-1 min-w-0 h-full">
-            <Workspace />
-          </div>
-          <PendingDock />
+        <div class="h-full min-h-0">
+          <Workspace />
         </div>
       {:else if view === 'settings'}
         <SettingsPage onBack={() => (view = 'timing')} />
