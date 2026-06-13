@@ -147,6 +147,7 @@
       style="top: {dropPos.top}px; left: {dropPos.left}px; width: {dropPos.width}px;"
     >
       {#each filtered as a, i (a.id)}
+        {@const anonAthlete = a.first_name === `#${a.bib_number}` && a.last_name === ''}
         <li>
           <button
             class="drop-item"
@@ -155,7 +156,11 @@
             onmousemove={() => { highlightIdx = i; }}
           >
             <span class="num drop-bib">{a.bib_number}</span>
-            <span class="drop-name">{a.first_name} {a.last_name}</span>
+            {#if anonAthlete}
+              <span class="drop-name drop-anon">senza nome</span>
+            {:else}
+              <span class="drop-name">{a.first_name} {a.last_name}</span>
+            {/if}
           </button>
         </li>
       {/each}
@@ -188,10 +193,8 @@
   }
 
   .bib-combobox.compact {
-    flex: 1;
-    min-width: 0;
-    max-width: 10rem;
-    width: auto;
+    width: 10rem;
+    flex-shrink: 0;
   }
 
   input {
@@ -259,5 +262,9 @@
   .drop-item-free {
     border-top: 1px dashed var(--line-2);
     margin-top: 0.1rem;
+  }
+  .drop-anon {
+    color: var(--accent-pending);
+    font-style: italic;
   }
 </style>

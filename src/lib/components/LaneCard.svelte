@@ -36,6 +36,9 @@
   let editingTimingId = $state<number | null>(null);
   let editBibInput = $state('');
   let movingPendingId = $state<number | null>(null);
+  let editingAthleteId = $state<number | null>(null);
+  let editAthleteFirst = $state('');
+  let editAthleteLast = $state('');
 
   $effect(() => {
     let alive = true;
@@ -205,6 +208,44 @@
   function cancelEditBib() {
     editingTimingId = null;
     editBibInput = '';
+  }
+
+  function isAnonymous(a: Athlete): boolean {
+    return a.first_name === `#${a.bib_number}` && a.last_name === '';
+  }
+
+  function startEditAthleteName(a: Athlete) {
+    editingAthleteId = a.id;
+    editAthleteFirst = isAnonymous(a) ? '' : a.first_name;
+    editAthleteLast = a.last_name;
+    editingTimingId = null;
+    error = null;
+  }
+
+  function cancelEditAthleteName() {
+    editingAthleteId = null;
+    editAthleteFirst = '';
+    editAthleteLast = '';
+  }
+
+  async function doSaveAthleteName(a: Athlete) {
+    const first = editAthleteFirst.trim();
+    const last = editAthleteLast.trim();
+    if (!first && !last) { error = 'inserisci almeno nome o cognome'; return; }
+    error = null;
+    try {
+      await api.saveAthlete(a.id, {
+        bib_number: a.bib_number,
+        first_name: first || `#${a.bib_number}`,
+        last_name: last,
+        course_id: a.course_id,
+        course_name: null,
+      });
+      cancelEditAthleteName();
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
   }
 
   async function commitEditBib(timingId: number) {
@@ -518,8 +559,10 @@
               {/if}
             </li>
           {:else}
-            {@const isEditing = editingTimingId === r.f.timing_id && r.f.timing_id != null}
-            <li class="row row-finish">
+            {@const isEditingBib = editingTimingId === r.f.timing_id && r.f.timing_id != null}
+            {@const isEditingName = editingAthleteId === r.f.athlete.id}
+            {@const anon = isAnonymous(r.f.athlete)}
+            <li class="row row-finish" class:row-anon={anon}>
               <span class="pos-chip pos-chip-done">{r.pos}</span>
               <span class="row-time-col">
                 <span class="num row-time">{formatMsToHms(r.f.total_ms ?? 0)}</span>
@@ -527,7 +570,7 @@
                   <span class="num row-elapsed">{formatMsToHms(r.f.finish_ms % 86_400_000)}</span>
                 {/if}
               </span>
-              {#if isEditing}
+              {#if isEditingBib}
                 <form
                   class="row-main"
                   onsubmit={(e) => {
@@ -544,33 +587,60 @@
                     autocomplete="off"
                   />
                   <span class="row-hint">nuovo pettorale</span>
-                  <button
-                    type="submit"
-                    class="btn-row btn-row-confirm"
-                    title="Salva"
-                    aria-label="Salva"
-                  >
-                    ✓
-                  </button>
+                  <button type="submit" class="btn-row btn-row-confirm" title="Salva">✓</button>
                   <button
                     type="button"
                     class="btn-row"
-                    title="Annulla modifica"
-                    aria-label="Annulla modifica"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      cancelEditBib();
-                    }}
-                  >
-                    ⌫
-                  </button>
+                    title="Annulla"
+                    onclick={(e) => { e.stopPropagation(); cancelEditBib(); }}
+                  >⌫</button>
+                </form>
+              {:else if isEditingName}
+                <form
+                  class="row-main"
+                  onsubmit={(e) => { e.preventDefault(); doSaveAthleteName(r.f.athlete); }}
+                >
+                  <input
+                    type="text"
+                    class="bib-input"
+                    bind:value={editAthleteFirst}
+                    placeholder="Nome"
+                    autocomplete="off"
+                    autofocus
+                  />
+                  <input
+                    type="text"
+                    class="bib-input"
+                    bind:value={editAthleteLast}
+                    placeholder="Cognome"
+                    autocomplete="off"
+                  />
+                  <button type="submit" class="btn-row btn-row-confirm" title="Salva">✓</button>
+                  <button
+                    type="button"
+                    class="btn-row"
+                    title="Annulla"
+                    onclick={(e) => { e.stopPropagation(); cancelEditAthleteName(); }}
+                  >⌫</button>
                 </form>
               {:else}
                 <div class="row-main">
                   <span class="row-bib num">#{r.f.athlete.bib_number}</span>
-                  <span class="row-name truncate">
-                    {r.f.athlete.first_name} {r.f.athlete.last_name}
-                  </span>
+                  {#if anon}
+                    <span class="anon-badge">SENZA NOME</span>
+                  {:else}
+                    <span class="row-name truncate">
+                      {r.f.athlete.first_name} {r.f.athlete.last_name}
+                    </span>
+                  {/if}
+                  <button
+                    type="button"
+                    class="btn-row"
+                    class:btn-row-warn={anon}
+                    title="Modifica nome atleta"
+                    aria-label="Modifica nome"
+                    onclick={(e) => { e.stopPropagation(); startEditAthleteName(r.f.athlete); }}
+                  >✎</button>
                   {#if r.f.timing_id != null}
                     <button
                       type="button"
@@ -581,9 +651,7 @@
                         e.stopPropagation();
                         startEditBib(r.f.timing_id!, r.f.athlete.bib_number);
                       }}
-                    >
-                      ✎
-                    </button>
+                    >#</button>
                     <button
                       type="button"
                       class="btn-row btn-row-danger"
@@ -593,9 +661,7 @@
                         e.stopPropagation();
                         doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
                       }}
-                    >
-                      ✕
-                    </button>
+                    >✕</button>
                   {/if}
                 </div>
               {/if}
@@ -717,8 +783,9 @@
   .row-main {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.4rem;
     min-width: 0;
+    justify-content: flex-end;
   }
   .row-bib {
     color: var(--accent-running);
@@ -728,15 +795,25 @@
   .row-name {
     color: var(--fg-1);
     font-weight: 500;
-    flex: 1;
     min-width: 0;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .row-hint {
     color: var(--fg-3);
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    flex: 1;
+  }
+  .bib-input {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.35rem;
+    width: 7rem;
+  }
+  .bib-input.num {
+    width: 10rem;
   }
   .btn-row {
     display: inline-flex;
@@ -778,6 +855,29 @@
   }
   .btn-row-danger:active {
     background: rgba(184, 85, 58, 0.2);
+  }
+  .btn-row-warn {
+    color: var(--accent-pending);
+    border-color: rgba(192, 138, 42, 0.4);
+  }
+  .btn-row-warn:hover {
+    background: rgba(192, 138, 42, 0.12);
+    color: var(--accent-pending);
+  }
+  .row-anon {
+    border-left: 3px solid var(--accent-pending);
+    padding-left: calc(0.75rem - 3px);
+  }
+  .anon-badge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent-pending);
+    border: 1px dashed var(--accent-pending);
+    border-radius: var(--radius-pill);
+    padding: 0.1rem 0.4rem;
+    flex-shrink: 0;
   }
   .btn-row-move {
     color: var(--fg-1);
