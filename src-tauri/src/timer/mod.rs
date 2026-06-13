@@ -139,9 +139,20 @@ pub async fn assign_pending(
         .ok_or_else(|| AppError::NotFound(format!("pending {}", pending_id)))?;
     let athlete = s.athletes_by_bib.get(&bib).cloned()
         .ok_or_else(|| AppError::NotFound(format!("bib {}", bib)))?;
-    let timing = repo.find_running_timing_for_athlete(athlete.id, operator_id)?
-        .ok_or_else(|| AppError::InvalidState(
-            format!("no running timing for athlete {}", athlete.id)))?;
+    let timing = match repo.find_running_timing_for_athlete(athlete.id, operator_id)? {
+        Some(t) => t,
+        None => {
+            // athlete registered after race start — create timing retroactively
+            let start_ms = s.courses.get(&pending.course_id)
+                .and_then(|c| c.started_at_ms)
+                .ok_or_else(|| AppError::InvalidState("course not started".into()))?;
+            let tid = repo.insert_timing_running(athlete.id, pending.course_id, start_ms, operator_id)?;
+            let t = repo.get_timing(tid)?.ok_or_else(|| AppError::NotFound("timing".into()))?;
+            s.timings_by_athlete.entry(athlete.id).or_default().push(t.id);
+            s.timings.insert(t.id, t.clone());
+            t
+        }
+    };
     let start = timing.start_timestamp_ms.ok_or_else(||
         AppError::InvalidState("timing has no start".into()))?;
     let total = pending.finish_timestamp_ms - start;
@@ -190,6 +201,20 @@ pub async fn delete_pending_finish(
     let mut s = state.write().await;
     repo.delete_pending_finish(pending_id)?;
     s.pending.retain(|p| p.id != pending_id);
+    Ok(())
+}
+
+pub async fn move_pending_to_course(
+    state: &SharedState,
+    repo: &Repo,
+    pending_id: i64,
+    target_course_id: i64,
+) -> AppResult<()> {
+    let mut s = state.write().await;
+    repo.update_pending_course(pending_id, target_course_id)?;
+    if let Some(p) = s.pending.iter_mut().find(|p| p.id == pending_id) {
+        p.course_id = target_course_id;
+    }
     Ok(())
 }
 

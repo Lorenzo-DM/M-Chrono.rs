@@ -475,6 +475,17 @@ impl Repo {
         Ok(())
     }
 
+    pub fn update_pending_course(&self, pending_id: i64, new_course_id: i64) -> AppResult<()> {
+        let n = self.lock().execute(
+            "UPDATE pending_finishes SET course_id = ?1 WHERE id = ?2 AND assigned = 0",
+            params![new_course_id, pending_id],
+        )?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("pending {}", pending_id)));
+        }
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub fn list_pending_open(&self, course_id: i64) -> AppResult<Vec<PendingFinish>> {
         let conn = self.lock();

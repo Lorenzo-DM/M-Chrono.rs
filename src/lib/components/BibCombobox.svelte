@@ -4,12 +4,14 @@
   let {
     athletes,
     onSelect,
+    onFreeEntry,
     autofocus = false,
     placeholder = 'cerca per numero o nome…',
     compact = false,
   }: {
     athletes: Athlete[];
     onSelect: (a: Athlete | null) => void;
+    onFreeEntry?: (bib: number) => void;
     autofocus?: boolean;
     placeholder?: string;
     compact?: boolean;
@@ -33,6 +35,15 @@
       );
     })
   );
+
+  let freeBib = $derived.by<number | null>(() => {
+    if (!onFreeEntry) return null;
+    const q = search.trim();
+    const n = parseInt(q);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const exact = athletes.find(a => a.bib_number === n);
+    return exact ? null : n;
+  });
 
   $effect(() => {
     if (highlightIdx >= filtered.length) highlightIdx = Math.max(0, filtered.length - 1);
@@ -88,15 +99,22 @@
       return;
     }
     if (!dropdownOpen) return;
+    const totalItems = filtered.length + (freeBib !== null ? 1 : 0);
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      highlightIdx = Math.min(highlightIdx + 1, filtered.length - 1);
+      highlightIdx = Math.min(highlightIdx + 1, totalItems - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       highlightIdx = Math.max(highlightIdx - 1, 0);
-    } else if (e.key === 'Enter' && filtered[highlightIdx]) {
+    } else if (e.key === 'Enter') {
       e.preventDefault();
-      selectAthlete(filtered[highlightIdx]);
+      if (freeBib !== null && highlightIdx === filtered.length) {
+        onFreeEntry!(freeBib);
+        search = '';
+        dropdownOpen = false;
+      } else if (filtered[highlightIdx]) {
+        selectAthlete(filtered[highlightIdx]);
+      }
     }
   }
 </script>
@@ -122,7 +140,7 @@
     onkeydown={onInputKeydown}
   />
 
-  {#if dropdownOpen && filtered.length > 0}
+  {#if dropdownOpen && (filtered.length > 0 || freeBib !== null)}
     <ul
       class="bib-dropdown panel-2"
       bind:this={listEl}
@@ -141,6 +159,24 @@
           </button>
         </li>
       {/each}
+      {#if freeBib !== null}
+        <li>
+          <button
+            class="drop-item drop-item-free"
+            class:highlighted={highlightIdx === filtered.length}
+            onmousedown={(e) => {
+              e.preventDefault();
+              onFreeEntry!(freeBib!);
+              search = '';
+              dropdownOpen = false;
+            }}
+            onmousemove={() => { highlightIdx = filtered.length; }}
+          >
+            <span class="num drop-bib" style="color: var(--accent-pending)">#{freeBib}</span>
+            <span class="drop-name" style="color: var(--fg-2)">non in lista → registra e assegna</span>
+          </button>
+        </li>
+      {/if}
     </ul>
   {/if}
 </div>
@@ -151,14 +187,22 @@
     width: 100%;
   }
 
+  .bib-combobox.compact {
+    flex: 1;
+    min-width: 0;
+    max-width: 10rem;
+    width: auto;
+  }
+
   input {
     width: 100%;
     font-size: 1.1rem;
   }
 
   .compact input {
-    font-size: 0.85rem;
-    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.35rem;
+    width: 100%;
   }
 
   .bib-dropdown {
@@ -210,5 +254,10 @@
 
   .compact .drop-name {
     font-size: 0.8rem;
+  }
+
+  .drop-item-free {
+    border-top: 1px dashed var(--line-2);
+    margin-top: 0.1rem;
   }
 </style>

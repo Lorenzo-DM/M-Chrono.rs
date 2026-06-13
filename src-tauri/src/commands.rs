@@ -183,6 +183,11 @@ pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> R
 }
 
 #[tauri::command]
+pub async fn move_pending_to_course(ctx: State<'_, AppCtx>, pending_id: i64, target_course_id: i64) -> Result<(), AppError> {
+    crate::timer::move_pending_to_course(&ctx.state, &ctx.repo, pending_id, target_course_id).await
+}
+
+#[tauri::command]
 pub async fn reassign_bib(app: AppHandle, ctx: State<'_, AppCtx>, timing_id: i64, new_bib: i64)
     -> Result<Timing, AppError> {
     let op = current_operator(&ctx).await?;

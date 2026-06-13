@@ -3,6 +3,7 @@
   import { api } from '../api';
   import { on } from '../events';
   import { formatMsToHms } from '../format';
+  import { courses } from '../stores';
   import type { Course, PendingFinish, AthleteRow, Athlete } from '../types';
   import ConfirmRaceModal from './ConfirmRaceModal.svelte';
   import Button from '../ui/Button.svelte';
@@ -34,6 +35,7 @@
   let showRestartModal = $state(false);
   let editingTimingId = $state<number | null>(null);
   let editBibInput = $state('');
+  let movingPendingId = $state<number | null>(null);
 
   $effect(() => {
     let alive = true;
@@ -137,15 +139,46 @@
     }
   }
 
+  async function doMovePending(pid: number, targetCourseId: number) {
+    movingPendingId = null;
+    error = null;
+    try {
+      await api.movePendingToCourse(pid, targetCourseId);
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
+  async function doFreeEntryAssign(pid: number, bib: number) {
+    error = null;
+    try {
+      await api.saveAthlete(null, {
+        bib_number: bib,
+        first_name: `#${bib}`,
+        last_name: '',
+        course_id: course.id,
+        course_name: null,
+      });
+      await api.assignPending(pid, bib);
+      const next = { ...selectedAthletes };
+      delete next[pid];
+      selectedAthletes = next;
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
   async function doDeletePending(pid: number, tsMs: number) {
     const label = formatMsToHms(tsMs % 86_400_000);
     if (!window.confirm(`Eliminare il tempo ${label}? Operazione irreversibile.`)) return;
     error = null;
     try {
       await api.deletePendingFinish(pid);
-      const next = { ...bibInputs };
+      const next = { ...selectedAthletes };
       delete next[pid];
-      bibInputs = next;
+      selectedAthletes = next;
       await refresh();
     } catch (e: any) {
       error = e?.message ?? String(e);
@@ -401,58 +434,98 @@
             <li class="row row-pending slide-in">
               <span class="pos-chip">{r.pos}</span>
               <span class="row-time-col">
-                <span class="num row-time">
-                  {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
-                </span>
                 {#if course.started_at_ms}
-                  <span class="num row-elapsed">
-                    +{formatMsToHms(r.p.finish_timestamp_ms - course.started_at_ms)}
+                  <span class="num row-time">
+                    {formatMsToHms(r.p.finish_timestamp_ms - course.started_at_ms)}
+                  </span>
+                {:else}
+                  <span class="num row-time">
+                    {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
                   </span>
                 {/if}
+                <span class="num row-elapsed">
+                  {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+                </span>
               </span>
-              <form
-                class="row-main"
-                onsubmit={(e) => {
-                  e.preventDefault();
-                  doAssign(r.p.id);
-                }}
-              >
-                <BibCombobox
-                  athletes={allAthletes}
-                  compact
-                  onSelect={(a) => {
-                    selectedAthletes = { ...selectedAthletes, [r.p.id]: a };
-                  }}
-                />
-                <button
-                  type="submit"
-                  class="btn-row btn-row-confirm"
-                  disabled={!selectedAthletes[r.p.id]}
-                  title="Assegna pettorale"
-                  aria-label="Assegna pettorale"
-                >
-                  ✓
-                </button>
-                <button
-                  type="button"
-                  class="btn-row btn-row-danger"
-                  title="Elimina tempo"
-                  aria-label="Elimina tempo"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    doDeletePending(r.p.id, r.p.finish_timestamp_ms);
+              {#if movingPendingId === r.p.id}
+                <div class="row-main">
+                  <span class="row-hint">sposta in:</span>
+                  {#each $courses.filter(c => c.id !== course.id) as c (c.id)}
+                    <button
+                      type="button"
+                      class="btn-row btn-row-move"
+                      onclick={() => doMovePending(r.p.id, c.id)}
+                    >{c.name}</button>
+                  {/each}
+                  <button
+                    type="button"
+                    class="btn-row"
+                    onclick={() => (movingPendingId = null)}
+                    title="Annulla"
+                  >✕</button>
+                </div>
+              {:else}
+                <form
+                  class="row-main"
+                  onsubmit={(e) => {
+                    e.preventDefault();
+                    doAssign(r.p.id);
                   }}
                 >
-                  ✕
-                </button>
-              </form>
+                  <BibCombobox
+                    athletes={allAthletes}
+                    compact
+                    placeholder="# o nome"
+                    onSelect={(a) => {
+                      selectedAthletes = { ...selectedAthletes, [r.p.id]: a };
+                    }}
+                    onFreeEntry={(bib) => doFreeEntryAssign(r.p.id, bib)}
+                  />
+                  <button
+                    type="submit"
+                    class="btn-row btn-row-confirm"
+                    disabled={!selectedAthletes[r.p.id]}
+                    title="Assegna pettorale"
+                    aria-label="Assegna pettorale"
+                  >
+                    ✓
+                  </button>
+                  {#if $courses.length > 1}
+                    <button
+                      type="button"
+                      class="btn-row"
+                      title="Sposta in altro percorso"
+                      aria-label="Sposta percorso"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        movingPendingId = r.p.id;
+                      }}
+                    >↔</button>
+                  {/if}
+                  <button
+                    type="button"
+                    class="btn-row btn-row-danger"
+                    title="Elimina tempo"
+                    aria-label="Elimina tempo"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      doDeletePending(r.p.id, r.p.finish_timestamp_ms);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </form>
+              {/if}
             </li>
           {:else}
             {@const isEditing = editingTimingId === r.f.timing_id && r.f.timing_id != null}
             <li class="row row-finish">
               <span class="pos-chip pos-chip-done">{r.pos}</span>
-              <span class="row-time num">
-                {formatMsToHms(r.f.total_ms ?? 0)}
+              <span class="row-time-col">
+                <span class="num row-time">{formatMsToHms(r.f.total_ms ?? 0)}</span>
+                {#if r.f.finish_ms}
+                  <span class="num row-elapsed">{formatMsToHms(r.f.finish_ms % 86_400_000)}</span>
+                {/if}
               </span>
               {#if isEditing}
                 <form
@@ -568,7 +641,7 @@
       elapsed = 0;
       pending = [];
       finishers = [];
-      bibInputs = {};
+      selectedAthletes = {};
       await refresh();
     }}
   />
@@ -705,6 +778,18 @@
   }
   .btn-row-danger:active {
     background: rgba(184, 85, 58, 0.2);
+  }
+  .btn-row-move {
+    color: var(--fg-1);
+    border-color: var(--line-2);
+    font-size: 0.72rem;
+    padding: 0 0.4rem;
+    width: auto;
+    white-space: nowrap;
+  }
+  .btn-row-move:hover {
+    background: var(--bg-3);
+    color: var(--fg-0);
   }
   .btn-tie {
     display: inline-flex;

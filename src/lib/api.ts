@@ -33,6 +33,8 @@ export const api = {
     invoke<Timing>('reassign_bib', { timingId, newBib }),
   deletePendingFinish: (pendingId: number) =>
     invoke<void>('delete_pending_finish', { pendingId }),
+  movePendingToCourse: (pendingId: number, targetCourseId: number) =>
+    invoke<void>('move_pending_to_course', { pendingId, targetCourseId }),
   updateOperatorId: (id: string) => invoke<void>('update_operator_id', { id }),
   updateConfig: (patch: Partial<AppConfig>) =>
     invoke<AppConfig>('update_config', { patch }),
