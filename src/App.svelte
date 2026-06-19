@@ -42,12 +42,18 @@
     // Single shared display poll + roster refresh on data-changing events.
     startDisplayPoll();
     const unsubs: Array<() => void> = [];
+    const refreshCourses = () => api.getCourses().then(courses.set);
     on('data:changed', () => {
       refreshAthletes();
       refreshCheckpoints();
-      api.getCourses().then(courses.set);
+      refreshCourses();
     }).then((u) => unsubs.push(u));
     on('athlete:finished', () => refreshAthletes()).then((u) => unsubs.push(u));
+    // Course lifecycle changes started_at/ended_at; keep the store in sync so
+    // status dots reflect the real state.
+    on('course:started', refreshCourses).then((u) => unsubs.push(u));
+    on('course:ended', refreshCourses).then((u) => unsubs.push(u));
+    on('course:reset', refreshCourses).then((u) => unsubs.push(u));
 
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;

@@ -66,7 +66,9 @@
           onclick={() => activeCourseId.set(c.id)}
         >
           <span class="num">{c.name}</span>
-          {#if c.started_at_ms}
+          {#if c.ended_at_ms}
+            <span class="dot-idle ml-2 inline-block" style="background: var(--accent-finish)"></span>
+          {:else if c.started_at_ms}
             <span class="dot-running ml-2 inline-block"></span>
           {/if}
         </button>
