@@ -518,7 +518,7 @@
         </div>
       </div>
     {:else}
-      <ul class="flex-1 overflow-auto">
+      <ul class="flex-1 overflow-auto rows-list">
         {#each rows as r (r.kind === 'pending' ? `p-${r.p.id}` : `f-${r.f.athlete.id}`)}
           {#if r.kind === 'pending'}
             <li class="row row-pending slide-in">
@@ -774,15 +774,50 @@
   .lane-card {
     overflow: hidden;
   }
+  .rows-list {
+    container-type: inline-size;
+  }
   .row {
     display: grid;
     grid-template-columns: 2.25rem 8rem 1fr;
+    grid-template-areas: "pos time main";
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--line-1);
     font-size: 0.9rem;
     transition: background 100ms;
+  }
+  .row > .pos-chip { grid-area: pos; }
+  .row > .row-time-col { grid-area: time; }
+  .row > .row-main { grid-area: main; }
+
+  /* Narrow card (small window / phone): stack time on top, controls below full width */
+  @container (max-width: 400px) {
+    .row {
+      grid-template-columns: 2.25rem 1fr;
+      grid-template-areas:
+        "pos time"
+        "main main";
+      row-gap: 0.5rem;
+      align-items: center;
+    }
+    .row > .row-time-col {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .row > .row-main {
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+    .row > .row-main :global(.bib-combobox.compact) {
+      flex: 1 1 8rem;
+      width: auto;
+    }
+    .row-name {
+      max-width: none;
+    }
   }
   .row:last-child {
     border-bottom: none;

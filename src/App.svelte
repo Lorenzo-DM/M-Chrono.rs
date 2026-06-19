@@ -114,7 +114,9 @@
           <Workspace />
         </div>
       {:else if view === 'settings'}
-        <SettingsPage onBack={() => (view = 'timing')} />
+        <div class="h-full overflow-auto">
+          <SettingsPage onBack={() => (view = 'timing')} />
+        </div>
       {:else if view === 'results'}
         <div class="h-full overflow-auto">
           <ResultsPage />

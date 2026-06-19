@@ -243,13 +243,13 @@ pub async fn move_pending_to_course(
     repo: &Repo,
     pending_id: i64,
     target_course_id: i64,
-) -> AppResult<()> {
+) -> AppResult<PendingFinish> {
     let mut s = state.write().await;
     repo.update_pending_course(pending_id, target_course_id)?;
-    if let Some(p) = s.pending.iter_mut().find(|p| p.id == pending_id) {
-        p.course_id = target_course_id;
-    }
-    Ok(())
+    let p = s.pending.iter_mut().find(|p| p.id == pending_id)
+        .ok_or_else(|| AppError::NotFound(format!("pending {}", pending_id)))?;
+    p.course_id = target_course_id;
+    Ok(p.clone())
 }
 
 pub async fn restart_course(
@@ -397,6 +397,22 @@ mod tests_pending {
         let t = assign_pending(&state, &repo, p.id, 2, "PC-A").await.unwrap();
         assert_eq!(t.total_time_ms, Some(4_000));
         assert!(state.read().await.pending.is_empty());
+    }
+
+    #[tokio::test]
+    async fn move_pending_updates_course_and_returns_it() {
+        let (state, repo, clock) = setup().await;
+        repo.upsert_course(&crate::models::Course {
+            id: 2, name: "y".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
+        }).unwrap();
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(4_000);
+        let p = capture_pending_finish(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        let moved = move_pending_to_course(&state, &repo, p.id, 2).await.unwrap();
+        assert_eq!(moved.course_id, 2);
+        let s = state.read().await;
+        assert_eq!(s.pending.iter().find(|x| x.id == p.id).unwrap().course_id, 2);
     }
 
     #[tokio::test]

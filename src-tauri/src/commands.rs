@@ -183,8 +183,10 @@ pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> R
 }
 
 #[tauri::command]
-pub async fn move_pending_to_course(ctx: State<'_, AppCtx>, pending_id: i64, target_course_id: i64) -> Result<(), AppError> {
-    crate::timer::move_pending_to_course(&ctx.state, &ctx.repo, pending_id, target_course_id).await
+pub async fn move_pending_to_course(app: AppHandle, ctx: State<'_, AppCtx>, pending_id: i64, target_course_id: i64) -> Result<(), AppError> {
+    let p = crate::timer::move_pending_to_course(&ctx.state, &ctx.repo, pending_id, target_course_id).await?;
+    let _ = app.emit("pending:captured", &p);
+    Ok(())
 }
 
 #[tauri::command]

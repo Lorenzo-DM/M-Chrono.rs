@@ -16,6 +16,8 @@
         "title": "Trail Race Timing",
         "width": 1280,
         "height": 800,
+        "minWidth": 360,
+        "minHeight": 540,
         "resizable": true
       }
     ],
