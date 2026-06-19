@@ -132,15 +132,15 @@
 
       <div class="flex-1"></div>
 
-      <!-- Layout switcher (timing view only) -->
-      {#if current === 'timing'}
+      <!-- Layout switcher (timing view only; slot kept to avoid nav shift) -->
+      <div class:invisible={current !== 'timing'} aria-hidden={current !== 'timing'}>
         <SegmentedControl
           ariaLabel="Layout"
           options={modes.map((m) => ({ value: m.id, label: m.icon, title: m.label }))}
           value={$layoutMode}
           onChange={(v) => layoutMode.set(v as LayoutMode)}
         />
-      {/if}
+      </div>
 
       <!-- Status cluster -->
       <div class="flex items-center gap-2 lg:gap-4 shrink-0">
