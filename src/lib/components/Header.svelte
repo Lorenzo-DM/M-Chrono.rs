@@ -16,11 +16,11 @@
     onDuplicates: () => void;
   }>();
 
-  const navItems: { id: NavView; label: string; enabled: boolean }[] = [
-    { id: 'timing',   label: 'Timing',   enabled: true  },
-    { id: 'results',  label: 'Results',  enabled: false },
-    { id: 'settings', label: 'Settings', enabled: true  },
-    { id: 'export',   label: 'Export',   enabled: false },
+  const navItems: { id: NavView; label: string; icon: string; enabled: boolean }[] = [
+    { id: 'timing',   label: 'Timing',   icon: '◷', enabled: true },
+    { id: 'results',  label: 'Results',  icon: '▤', enabled: true },
+    { id: 'settings', label: 'Settings', icon: '⚙', enabled: true },
+    { id: 'export',   label: 'Export',   icon: '⇩', enabled: true },
   ];
 
   const modes: { id: LayoutMode; label: string; icon: string }[] = [
@@ -125,6 +125,7 @@
             onclick={() => n.enabled && onNav(n.id)}
             title={n.enabled ? n.label : `${n.label} — prossimamente`}
           >
+            <span class="nav-ico" aria-hidden="true">{n.icon}</span>
             {n.label}
           </button>
         {/each}
@@ -183,9 +184,11 @@
           {$resolvedTheme === 'dark' ? '☀' : '☾'}
         </Button>
 
-        <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
-          <span style="color: var(--accent-dup)">⚠</span> DUP
-        </Button>
+        {#if $config?.sync_enabled}
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+            <span style="color: var(--accent-dup)">⚠</span> DUP
+          </Button>
+        {/if}
       </div>
     {/if}
   </div>
@@ -205,6 +208,7 @@
             onclick={() => n.enabled && navClick(n.id)}
             title={n.enabled ? n.label : `${n.label} — prossimamente`}
           >
+            <span class="nav-ico" aria-hidden="true">{n.icon}</span>
             {n.label}
           </button>
         {/each}
@@ -238,15 +242,24 @@
           {$resolvedTheme === 'dark' ? '☀ Chiaro' : '☾ Scuro'}
         </Button>
 
-        <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
-          <span style="color: var(--accent-dup)">⚠</span> DUP
-        </Button>
+        {#if $config?.sync_enabled}
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+            <span style="color: var(--accent-dup)">⚠</span> DUP
+          </Button>
+        {/if}
       </div>
     </div>
   {/if}
 </header>
 
 <style>
+  .nav-ico {
+    display: inline-block;
+    margin-right: 0.35rem;
+    font-size: 0.95em;
+    opacity: 0.85;
+    font-style: normal;
+  }
   .nav-link {
     padding: 0.4rem 0.85rem;
     font-size: 0.82rem;
