@@ -28,6 +28,15 @@
         sync_enabled: $config?.sync_enabled ?? false,
     });
 
+    type SettingsTab = "generale" | "gara" | "atleti" | "sync";
+    const tabs: { id: SettingsTab; label: string }[] = [
+        { id: "generale", label: "Generale" },
+        { id: "gara", label: "Gara" },
+        { id: "atleti", label: "Atleti" },
+        { id: "sync", label: "Sync" },
+    ];
+    let tab = $state<SettingsTab>("generale");
+
     let saving = $state(false);
     let saved = $state(false);
     let showLogin = $state(false);
@@ -129,7 +138,7 @@
 </script>
 
 <div class="p-6 max-w-5xl mx-auto">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-5">
         <div>
             <div class="hud" style="color: var(--fg-3)">CONFIGURAZIONE</div>
             <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">
@@ -138,6 +147,39 @@
         </div>
     </div>
 
+    <!-- Sub-tabs -->
+    <div class="settings-tabs" role="tablist" aria-label="Sezioni impostazioni">
+        {#each tabs as t (t.id)}
+            <button
+                class="settings-tab"
+                role="tab"
+                aria-selected={tab === t.id}
+                data-active={tab === t.id}
+                onclick={() => (tab = t.id)}
+            >
+                {t.label}
+            </button>
+        {/each}
+    </div>
+
+    {#snippet saveFooter()}
+        <div class="flex items-center gap-3 pt-1">
+            <Button
+                variant="primary"
+                disabled={saving}
+                onclick={save}
+                class="px-6 py-3"
+            >
+                {saving ? "SALVATAGGIO…" : "SALVA CONFIGURAZIONE"}
+            </Button>
+            {#if saved}
+                <span class="hud" style="color: var(--accent-start)">✓ SALVATO</span>
+            {/if}
+        </div>
+    {/snippet}
+
+    <!-- ============ GENERALE ============ -->
+    {#if tab === "generale"}
     <div class="grid grid-cols-12 gap-4">
         <!-- General -->
         <section class="panel p-4 col-span-6">
@@ -193,6 +235,13 @@
             />
         </section>
 
+        <div class="col-span-12">{@render saveFooter()}</div>
+    </div>
+    {/if}
+
+    <!-- ============ GARA ============ -->
+    {#if tab === "gara"}
+    <div class="grid grid-cols-12 gap-4">
         <!-- Race + courses -->
         <section class="panel p-4 col-span-12">
             <div class="hud mb-4">GARA / PERCORSI</div>
@@ -204,7 +253,12 @@
             <div class="hud mb-4">CHECKPOINT / TEMPI PARZIALI</div>
             <CheckpointsPanel />
         </section>
+    </div>
+    {/if}
 
+    <!-- ============ ATLETI ============ -->
+    {#if tab === "atleti"}
+    <div class="grid grid-cols-12 gap-4">
         <!-- Athletes -->
         <section class="panel p-4 col-span-12">
             <div class="hud mb-4">ATLETI</div>
@@ -275,7 +329,12 @@
                 </div>
             {/if}
         </section>
+    </div>
+    {/if}
 
+    <!-- ============ SYNC ============ -->
+    {#if tab === "sync"}
+    <div class="grid grid-cols-12 gap-4">
         <!-- Sync -->
         <section class="panel p-4 col-span-12">
             <div class="flex items-center justify-between mb-4">
@@ -366,25 +425,9 @@
             {/if}
         </section>
 
-        <!-- Save button -->
-        <div class="col-span-12 flex items-center gap-3">
-            <Button
-                variant="primary"
-                disabled={saving}
-                onclick={save}
-                class="px-6 py-3"
-            >
-                {saving ? "SALVATAGGIO…" : "SALVA CONFIGURAZIONE"}
-            </Button>
-            {#if saved}
-                <span class="hud" style="color: var(--accent-start)"
-                    >✓ SALVATO</span
-                >
-            {/if}
-        </div>
-
-        <!-- Export moved to its own EXPORT view in the top nav. -->
+        <div class="col-span-12">{@render saveFooter()}</div>
     </div>
+    {/if}
 </div>
 
 {#if showLogin}
@@ -409,3 +452,43 @@
         }}
     />
 {/if}
+
+<style>
+    .settings-tabs {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        margin-bottom: 1.5rem;
+        background: var(--bg-2);
+        border: 1px solid var(--line-1);
+        border-radius: var(--radius-md);
+        overflow-x: auto;
+    }
+    .settings-tab {
+        flex: 1;
+        min-width: max-content;
+        padding: 0.55rem 1rem;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.8rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        background: transparent;
+        border: none;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition:
+            color 120ms ease,
+            background 120ms ease,
+            box-shadow 120ms ease;
+    }
+    .settings-tab:hover {
+        color: var(--fg-1);
+    }
+    .settings-tab[data-active="true"] {
+        color: var(--fg-0);
+        background: var(--bg-0);
+        box-shadow: inset 0 -2px 0 var(--accent-running);
+    }
+</style>
