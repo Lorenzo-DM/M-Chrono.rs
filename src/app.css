@@ -298,15 +298,15 @@ body {
     font-size: 1rem;
 }
 
-/* Inputs — rounded */
-input[type="text"],
-input[type="number"],
-input[type="password"],
-input[type="url"],
+/* Inputs — rounded.
+   :where() keeps specificity at element-level (like the old [type] rule) so
+   component classes (.bib-input, .compact input, …) still win, while bare
+   <input> with no type attribute also gets the border/fill. */
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"])),
 select,
 textarea {
     background: var(--bg-0);
-    border: 1px solid var(--line-2);
+    border: 1px solid var(--line-3);
     color: var(--fg-0);
     padding: 0.6rem 0.85rem;
     border-radius: var(--radius-md);
@@ -315,12 +315,21 @@ textarea {
     transition: border-color 120ms, box-shadow 120ms, background 120ms;
     font-size: 0.95rem;
 }
-input:focus,
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"])):hover,
+select:hover,
+textarea:hover {
+    border-color: var(--fg-3);
+}
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"])):focus,
 select:focus,
 textarea:focus {
     border-color: var(--accent-running);
     box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
     background: var(--bg-1);
+}
+input::placeholder,
+textarea::placeholder {
+    color: var(--fg-3);
 }
 
 /* Big chrono display */
