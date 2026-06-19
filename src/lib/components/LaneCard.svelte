@@ -3,9 +3,11 @@
   import { api } from '../api';
   import { on } from '../events';
   import { formatMsToHms } from '../format';
-  import { courses } from '../stores';
+  import { courses, courseSnapshots, allAthletes, checkpoints } from '../stores';
+  import { beep } from '../sound';
   import type { Course, PendingFinish, AthleteRow, Athlete } from '../types';
   import ConfirmRaceModal from './ConfirmRaceModal.svelte';
+  import ConfirmModal from './ConfirmModal.svelte';
   import Button from '../ui/Button.svelte';
   import BibCombobox from './BibCombobox.svelte';
 
@@ -21,18 +23,15 @@
     onFocus?: () => void;
   }>();
 
-  let elapsed = $state(0);
-  let started = $state(false);
-  let ended = $state(false);
   let pending = $state<PendingFinish[]>([]);
   let finishers = $state<AthleteRow[]>([]);
   let flashing = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
   let selectedAthletes = $state<Record<number, Athlete | null>>({});
-  let allAthletes = $state<Athlete[]>([]);
   let showEndModal = $state(false);
   let showRestartModal = $state(false);
+  let confirmState = $state<{ message: string; onConfirm: () => void } | null>(null);
   let editingTimingId = $state<number | null>(null);
   let editBibInput = $state('');
   let movingPendingId = $state<number | null>(null);
@@ -40,29 +39,41 @@
   let editAthleteFirst = $state('');
   let editAthleteLast = $state('');
 
+  // Live timer/state come from the single shared display poll (see stores.ts).
+  let snap = $derived($courseSnapshots[course.id]);
+  let elapsed = $derived(snap?.elapsed_ms ?? 0);
+  let started = $derived(snap?.started ?? false);
+  let ended = $derived(snap?.ended ?? false);
+
+  // Athlete roster for this course comes from the shared store.
+  let courseAthletes = $derived($allAthletes.filter((a) => a.course_id === course.id));
+
+  // Checkpoints for this course (intermediate split capture).
+  let courseCheckpoints = $derived(
+    $checkpoints
+      .filter((c) => c.course_id === course.id)
+      .sort((a, b) => a.position - b.position),
+  );
+  let splitCheckpointId = $state<number | null>(null);
   $effect(() => {
-    let alive = true;
-    const tick = async () => {
-      if (!alive) return;
-      try {
-        const snap = await api.pollDisplay();
-        const c = snap.courses.find((x) => x.id === course.id);
-        if (c) {
-          elapsed = c.elapsed_ms ?? 0;
-          started = c.started;
-          ended = c.ended;
-        }
-      } catch {
-        // transient
-      }
-    };
-    tick();
-    const id = window.setInterval(tick, 100);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
+    if (splitCheckpointId == null && courseCheckpoints.length > 0) {
+      splitCheckpointId = courseCheckpoints[0].id;
+    }
   });
+
+  async function doRecordSplit(bib: number) {
+    if (splitCheckpointId == null) return;
+    error = null;
+    try {
+      await api.recordSplit(splitCheckpointId, bib);
+      beep('capture');
+      flashing = true;
+      setTimeout(() => (flashing = false), 400);
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+      beep('error');
+    }
+  }
 
   async function refresh() {
     try {
@@ -71,7 +82,6 @@
         api.getAthletesByCourse(course.id),
       ]);
       pending = [...p].sort((x, y) => y.finish_timestamp_ms - x.finish_timestamp_ms);
-      allAthletes = a.map(r => r.athlete);
       finishers = a
         .filter((r) => r.status === 'Finished')
         .sort((x, y) => (y.finish_ms ?? 0) - (x.finish_ms ?? 0));
@@ -107,10 +117,12 @@
     try {
       const p = await api.capturePending(course.id);
       pending = [p, ...pending];
+      beep('capture');
       flashing = true;
       setTimeout(() => (flashing = false), 600);
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
@@ -120,10 +132,12 @@
     try {
       const p = await api.capturePendingTie(course.id);
       pending = [p, ...pending];
+      beep('capture');
       flashing = true;
       setTimeout(() => (flashing = false), 600);
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
@@ -136,9 +150,11 @@
       const next = { ...selectedAthletes };
       delete next[pid];
       selectedAthletes = next;
+      beep('assign');
       await refresh();
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
@@ -158,45 +174,56 @@
     try {
       await api.saveAthlete(null, {
         bib_number: bib,
-        first_name: `#${bib}`,
+        first_name: '',
         last_name: '',
         course_id: course.id,
         course_name: null,
+        anonymous: true,
       });
       await api.assignPending(pid, bib);
       const next = { ...selectedAthletes };
       delete next[pid];
       selectedAthletes = next;
+      beep('assign');
       await refresh();
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
-  async function doDeletePending(pid: number, tsMs: number) {
+  function doDeletePending(pid: number, tsMs: number) {
     const label = formatMsToHms(tsMs % 86_400_000);
-    if (!window.confirm(`Eliminare il tempo ${label}? Operazione irreversibile.`)) return;
-    error = null;
-    try {
-      await api.deletePendingFinish(pid);
-      const next = { ...selectedAthletes };
-      delete next[pid];
-      selectedAthletes = next;
-      await refresh();
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-    }
+    confirmState = {
+      message: `Eliminare il tempo ${label}? Operazione irreversibile.`,
+      onConfirm: async () => {
+        error = null;
+        try {
+          await api.deletePendingFinish(pid);
+          const next = { ...selectedAthletes };
+          delete next[pid];
+          selectedAthletes = next;
+          await refresh();
+        } catch (e: any) {
+          error = e?.message ?? String(e);
+        }
+      },
+    };
   }
 
-  async function doUndoFinish(timingId: number, bib: number) {
-    if (!window.confirm(`Annullare l'arrivo del pettorale #${bib}? L'atleta torna in gara.`)) return;
-    error = null;
-    try {
-      await api.undoFinish(timingId);
-      await refresh();
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-    }
+  function doUndoFinish(timingId: number, bib: number) {
+    confirmState = {
+      message: `Annullare l'arrivo del pettorale #${bib}? L'atleta torna in gara.`,
+      onConfirm: async () => {
+        error = null;
+        try {
+          await api.undoFinish(timingId);
+          await refresh();
+        } catch (e: any) {
+          error = e?.message ?? String(e);
+        }
+      },
+    };
   }
 
   function startEditBib(timingId: number, currentBib: number) {
@@ -211,7 +238,7 @@
   }
 
   function isAnonymous(a: Athlete): boolean {
-    return a.first_name === `#${a.bib_number}` && a.last_name === '';
+    return a.anonymous;
   }
 
   function startEditAthleteName(a: Athlete) {
@@ -236,10 +263,12 @@
     try {
       await api.saveAthlete(a.id, {
         bib_number: a.bib_number,
-        first_name: first || `#${a.bib_number}`,
+        first_name: first,
         last_name: last,
         course_id: a.course_id,
         course_name: null,
+        category: a.category,
+        anonymous: false,
       });
       cancelEditAthleteName();
       await refresh();
@@ -440,6 +469,26 @@
     {/if}
   </div>
 
+  <!-- Checkpoint split capture -->
+  {#if started && !ended && courseCheckpoints.length > 0}
+    <div class="px-3 py-2 border-b flex items-center gap-2" style="border-color: var(--line-2); background: var(--bg-1)">
+      <span class="hud" style="color: var(--fg-3)">SPLIT</span>
+      <select bind:value={splitCheckpointId} class="text-sm" style="max-width: 9rem">
+        {#each courseCheckpoints as cp (cp.id)}
+          <option value={cp.id}>{cp.name}</option>
+        {/each}
+      </select>
+      <div class="flex-1 min-w-0">
+        <BibCombobox
+          athletes={courseAthletes}
+          compact
+          placeholder="# o nome → parziale"
+          onSelect={(a) => a && doRecordSplit(a.bib_number)}
+        />
+      </div>
+    </div>
+  {/if}
+
   <!-- Mixed history list -->
   <div class="flex-1 min-h-0 flex flex-col">
     <div
@@ -514,7 +563,7 @@
                   }}
                 >
                   <BibCombobox
-                    athletes={allAthletes}
+                    athletes={courseAthletes}
                     compact
                     placeholder="# o nome"
                     onSelect={(a) => {
@@ -689,7 +738,6 @@
     onClose={() => (showEndModal = false)}
     onConfirm={async (typed) => {
       await api.endCourse(course.id, typed);
-      ended = true;
       await refresh();
     }}
   />
@@ -702,13 +750,22 @@
     onClose={() => (showRestartModal = false)}
     onConfirm={async (typed) => {
       await api.restartCourse(course.id, typed);
-      ended = false;
-      started = false;
-      elapsed = 0;
       pending = [];
       finishers = [];
       selectedAthletes = {};
       await refresh();
+    }}
+  />
+{/if}
+
+{#if confirmState}
+  <ConfirmModal
+    message={confirmState.message}
+    onCancel={() => (confirmState = null)}
+    onConfirm={() => {
+      const c = confirmState;
+      confirmState = null;
+      c?.onConfirm();
     }}
   />
 {/if}

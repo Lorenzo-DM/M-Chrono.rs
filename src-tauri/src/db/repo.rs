@@ -1,7 +1,7 @@
 use crate::error::{AppError, AppResult};
-use crate::models::{Athlete, Course, PendingFinish, Race, Timing, TimingStatus};
+use crate::models::{Athlete, Checkpoint, Course, PendingFinish, Race, Split, Timing, TimingStatus};
 use crate::timer::clock::{ClockProvider, SystemClock};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -14,6 +14,7 @@ pub struct ResultRow {
     pub bib_number: Option<i64>,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
+    pub category: Option<String>,
     pub course_id: i64,
     pub course_name: String,
     pub start_timestamp_ms: Option<i64>,
@@ -47,8 +48,11 @@ impl Repo {
         Self { conn, clock }
     }
 
+    /// Recover from a poisoned lock instead of propagating the panic: a thread
+    /// that panicked mid-operation leaves the SQLite connection usable (its own
+    /// statement is rolled back), so subsequent DB calls should keep working.
     fn lock(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().expect("poisoned db lock")
+        self.conn.lock().unwrap_or_else(|p| p.into_inner())
     }
 
     pub fn upsert_course(&self, c: &Course) -> AppResult<()> {
@@ -119,11 +123,13 @@ impl Repo {
 
     // ---- Local course management ------------------------------------------
 
-    pub fn update_course(&self, id: i64, name: &str, race_id: Option<i64>) -> AppResult<()> {
+    pub fn update_course(&self, id: i64, name: &str, race_id: Option<i64>,
+                         distance_m: Option<i64>) -> AppResult<()> {
         let now = self.clock.now_ms();
         let n = self.lock().execute(
-            "UPDATE courses SET name = ?1, race_id = ?2, updated_at_ms = ?3 WHERE id = ?4",
-            params![name, race_id, now, id],
+            "UPDATE courses SET name = ?1, race_id = ?2, distance_m = ?3, updated_at_ms = ?4
+             WHERE id = ?5",
+            params![name, race_id, distance_m, now, id],
         )?;
         if n == 0 {
             return Err(AppError::NotFound(format!("course {}", id)));
@@ -155,15 +161,18 @@ impl Repo {
         let now = self.clock.now_ms();
         self.lock().execute(
             "INSERT INTO athletes(id, bib_number, first_name, last_name, course_id,
-                                  created_at_ms, updated_at_ms)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?6)
+                                  category, anonymous, created_at_ms, updated_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
              ON CONFLICT(id) DO UPDATE SET
                  bib_number = excluded.bib_number,
                  first_name = excluded.first_name,
                  last_name = excluded.last_name,
                  course_id = excluded.course_id,
+                 category = excluded.category,
+                 anonymous = excluded.anonymous,
                  updated_at_ms = excluded.updated_at_ms",
-            params![a.id, a.bib_number, a.first_name, a.last_name, a.course_id, now],
+            params![a.id, a.bib_number, a.first_name, a.last_name, a.course_id,
+                    a.category, a.anonymous as i64, now],
         )?;
         Ok(())
     }
@@ -201,18 +210,23 @@ impl Repo {
         }
     }
 
+    fn map_athlete(r: &rusqlite::Row) -> rusqlite::Result<Athlete> {
+        Ok(Athlete {
+            id: r.get(0)?, bib_number: r.get(1)?, first_name: r.get(2)?,
+            last_name: r.get(3)?, course_id: r.get(4)?,
+            category: r.get(5)?, anonymous: r.get::<_, i64>(6)? != 0,
+        })
+    }
+
     pub fn find_athlete_by_bib(&self, bib: i64) -> AppResult<Option<Athlete>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, bib_number, first_name, last_name, course_id
+            "SELECT id, bib_number, first_name, last_name, course_id, category, anonymous
              FROM athletes WHERE bib_number = ?1 LIMIT 1"
         )?;
         let mut rows = stmt.query(params![bib])?;
         match rows.next()? {
-            Some(r) => Ok(Some(Athlete {
-                id: r.get(0)?, bib_number: r.get(1)?, first_name: r.get(2)?,
-                last_name: r.get(3)?, course_id: r.get(4)?,
-            })),
+            Some(r) => Ok(Some(Self::map_athlete(r)?)),
             None => Ok(None),
         }
     }
@@ -292,12 +306,10 @@ impl Repo {
     pub fn list_athletes(&self) -> AppResult<Vec<Athlete>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, bib_number, first_name, last_name, course_id FROM athletes ORDER BY bib_number"
+            "SELECT id, bib_number, first_name, last_name, course_id, category, anonymous
+             FROM athletes ORDER BY bib_number"
         )?;
-        let rows = stmt.query_map([], |r| Ok(Athlete {
-            id: r.get(0)?, bib_number: r.get(1)?, first_name: r.get(2)?,
-            last_name: r.get(3)?, course_id: r.get(4)?,
-        }))?;
+        let rows = stmt.query_map([], Self::map_athlete)?;
         Ok(rows.filter_map(Result::ok).collect())
     }
 
@@ -305,13 +317,10 @@ impl Repo {
     pub fn list_athletes_by_course(&self, course_id: i64) -> AppResult<Vec<Athlete>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT id, bib_number, first_name, last_name, course_id
+            "SELECT id, bib_number, first_name, last_name, course_id, category, anonymous
              FROM athletes WHERE course_id = ?1 ORDER BY bib_number"
         )?;
-        let rows = stmt.query_map(params![course_id], |r| Ok(Athlete {
-            id: r.get(0)?, bib_number: r.get(1)?, first_name: r.get(2)?,
-            last_name: r.get(3)?, course_id: r.get(4)?,
-        }))?;
+        let rows = stmt.query_map(params![course_id], Self::map_athlete)?;
         Ok(rows.filter_map(Result::ok).collect())
     }
 
@@ -555,7 +564,6 @@ impl Repo {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn record_sync_error_timing(&self, local_id: i64, error: &str) -> AppResult<()> {
         self.lock().execute(
             "UPDATE timings SET sync_attempts = sync_attempts + 1, last_sync_error = ?1
@@ -563,6 +571,29 @@ impl Repo {
             params![error, local_id],
         )?;
         Ok(())
+    }
+
+    pub fn record_sync_error_pending(&self, local_id: i64) -> AppResult<()> {
+        self.lock().execute(
+            "UPDATE pending_finishes SET sync_attempts = sync_attempts + 1 WHERE id = ?1",
+            params![local_id],
+        )?;
+        Ok(())
+    }
+
+    /// Most recent sync error stored on any unsynced timing, if any.
+    pub fn last_sync_error(&self) -> AppResult<Option<String>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT last_sync_error FROM timings
+             WHERE synced = 0 AND last_sync_error IS NOT NULL
+             ORDER BY updated_at_ms DESC LIMIT 1"
+        )?;
+        let mut rows = stmt.query([])?;
+        match rows.next()? {
+            Some(r) => Ok(r.get(0)?),
+            None => Ok(None),
+        }
     }
 
     pub fn upsert_remote_timing(&self, t: &Timing) -> AppResult<()> {
@@ -604,6 +635,19 @@ impl Repo {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    /// Athlete ids whose Finished timings changed at or after `since_ms`.
+    /// Used to run duplicate grouping only on recently-touched athletes.
+    pub fn athletes_with_finishes_since(&self, since_ms: i64) -> AppResult<Vec<i64>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT athlete_id FROM timings
+             WHERE status = 'Finished' AND athlete_id IS NOT NULL
+               AND updated_at_ms >= ?1"
+        )?;
+        let rows = stmt.query_map(params![since_ms], |r| r.get::<_, i64>(0))?;
+        Ok(rows.filter_map(Result::ok).collect())
     }
 
     pub fn list_finished_timings_for_athlete(&self, athlete_id: i64) -> AppResult<Vec<Timing>> {
@@ -648,7 +692,7 @@ impl Repo {
     pub fn list_results_by_course(&self, course_id: i64) -> AppResult<Vec<ResultRow>> {
         let conn = self.lock();
         let mut stmt = conn.prepare(
-            "SELECT t.id, t.athlete_id, a.bib_number, a.first_name, a.last_name,
+            "SELECT t.id, t.athlete_id, a.bib_number, a.first_name, a.last_name, a.category,
                     t.course_id, c.name,
                     t.start_timestamp_ms, t.finish_timestamp_ms, t.total_time_ms,
                     t.status, t.operator_id, t.duplicate_flagged
@@ -661,11 +705,11 @@ impl Repo {
         )?;
         let rows = stmt.query_map(params![course_id], |r| Ok(ResultRow {
             timing_id: r.get(0)?, athlete_id: r.get(1)?, bib_number: r.get(2)?,
-            first_name: r.get(3)?, last_name: r.get(4)?,
-            course_id: r.get(5)?, course_name: r.get(6)?,
-            start_timestamp_ms: r.get(7)?, finish_timestamp_ms: r.get(8)?,
-            total_time_ms: r.get(9)?, status: r.get(10)?, operator_id: r.get(11)?,
-            duplicate_flagged: r.get::<_, i64>(12)? != 0,
+            first_name: r.get(3)?, last_name: r.get(4)?, category: r.get(5)?,
+            course_id: r.get(6)?, course_name: r.get(7)?,
+            start_timestamp_ms: r.get(8)?, finish_timestamp_ms: r.get(9)?,
+            total_time_ms: r.get(10)?, status: r.get(11)?, operator_id: r.get(12)?,
+            duplicate_flagged: r.get::<_, i64>(13)? != 0,
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
     }
@@ -749,6 +793,143 @@ impl Repo {
         }))?;
         Ok(rows.filter_map(Result::ok).collect())
     }
+
+    // ---- Backup / restore --------------------------------------------------
+
+    /// Write a consistent snapshot of the whole database to `dest`.
+    pub fn backup_to(&self, dest: &std::path::Path) -> AppResult<()> {
+        let conn = self.lock();
+        // VACUUM INTO needs a literal path; escape single quotes defensively.
+        let p = dest.to_string_lossy().replace('\'', "''");
+        conn.execute_batch(&format!("VACUUM INTO '{}'", p))?;
+        Ok(())
+    }
+
+    /// Replace all data with the contents of a backup database at `src`.
+    /// Destructive: existing rows are cleared first, inside one transaction.
+    pub fn restore_from(&self, src: &std::path::Path) -> AppResult<()> {
+        if !src.exists() {
+            return Err(AppError::NotFound(format!("backup {}", src.display())));
+        }
+        let p = src.to_string_lossy().replace('\'', "''");
+        let mut conn = self.lock();
+        conn.execute_batch(&format!("ATTACH DATABASE '{}' AS backup", p))?;
+        let result = (|| -> AppResult<()> {
+            let tx = conn.transaction()?;
+            // Child rows first to satisfy foreign keys, parents last.
+            for table in ["splits", "checkpoints", "pending_finishes", "timings",
+                          "athletes", "courses", "races", "sync_cursor"] {
+                tx.execute(&format!("DELETE FROM {table}"), [])?;
+            }
+            for table in ["races", "courses", "athletes", "timings",
+                          "pending_finishes", "checkpoints", "splits", "sync_cursor"] {
+                tx.execute(
+                    &format!("INSERT INTO {table} SELECT * FROM backup.{table}"), [],
+                )?;
+            }
+            tx.commit()?;
+            Ok(())
+        })();
+        let _ = conn.execute_batch("DETACH DATABASE backup");
+        result
+    }
+
+    // ---- Checkpoints -------------------------------------------------------
+
+    pub fn next_local_checkpoint_id(&self) -> AppResult<i64> {
+        let min: i64 = self.lock().query_row(
+            "SELECT COALESCE(MIN(id), 0) FROM checkpoints", [], |r| r.get(0),
+        )?;
+        Ok(min.min(0) - 1)
+    }
+
+    pub fn upsert_checkpoint(&self, c: &Checkpoint) -> AppResult<()> {
+        let now = self.clock.now_ms();
+        self.lock().execute(
+            "INSERT INTO checkpoints(id, course_id, name, position, created_at_ms, updated_at_ms)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?5)
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 position = excluded.position,
+                 updated_at_ms = excluded.updated_at_ms",
+            params![c.id, c.course_id, c.name, c.position, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_checkpoint(&self, id: i64) -> AppResult<()> {
+        let mut conn = self.lock();
+        let tx = conn.transaction()?;
+        tx.execute("DELETE FROM splits WHERE checkpoint_id = ?1", params![id])?;
+        let n = tx.execute("DELETE FROM checkpoints WHERE id = ?1", params![id])?;
+        if n == 0 {
+            return Err(AppError::NotFound(format!("checkpoint {}", id)));
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_checkpoints(&self) -> AppResult<Vec<Checkpoint>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, course_id, name, position FROM checkpoints
+             ORDER BY course_id, position, id"
+        )?;
+        let rows = stmt.query_map([], |r| Ok(Checkpoint {
+            id: r.get(0)?, course_id: r.get(1)?, name: r.get(2)?, position: r.get(3)?,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
+
+    // ---- Splits ------------------------------------------------------------
+
+    /// Record (or overwrite) an athlete's passage at a checkpoint. The split
+    /// time is measured from the course start when available.
+    pub fn record_split(&self, athlete_id: i64, checkpoint_id: i64, course_id: i64,
+                        ts_ms: i64, operator_id: &str) -> AppResult<Split> {
+        let now = self.clock.now_ms();
+        let start: Option<i64> = self.lock().query_row(
+            "SELECT started_at_ms FROM courses WHERE id = ?1",
+            params![course_id], |r| r.get::<_, Option<i64>>(0),
+        ).optional()?.flatten();
+        let split_time_ms = start.map(|s| (ts_ms - s).max(0));
+        let conn = self.lock();
+        conn.execute(
+            "INSERT INTO splits(athlete_id, checkpoint_id, course_id, timestamp_ms,
+                                split_time_ms, operator_id, created_at_ms, synced)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)
+             ON CONFLICT(athlete_id, checkpoint_id) DO UPDATE SET
+                 timestamp_ms = excluded.timestamp_ms,
+                 split_time_ms = excluded.split_time_ms,
+                 operator_id = excluded.operator_id,
+                 synced = 0",
+            params![athlete_id, checkpoint_id, course_id, ts_ms, split_time_ms,
+                    operator_id, now],
+        )?;
+        let id = conn.query_row(
+            "SELECT id FROM splits WHERE athlete_id = ?1 AND checkpoint_id = ?2",
+            params![athlete_id, checkpoint_id], |r| r.get(0),
+        )?;
+        Ok(Split {
+            id, athlete_id, checkpoint_id, course_id, timestamp_ms: ts_ms,
+            split_time_ms, operator_id: operator_id.into(),
+        })
+    }
+
+    pub fn list_splits_by_course(&self, course_id: i64) -> AppResult<Vec<Split>> {
+        let conn = self.lock();
+        let mut stmt = conn.prepare(
+            "SELECT id, athlete_id, checkpoint_id, course_id, timestamp_ms,
+                    split_time_ms, operator_id
+             FROM splits WHERE course_id = ?1 ORDER BY checkpoint_id, timestamp_ms"
+        )?;
+        let rows = stmt.query_map(params![course_id], |r| Ok(Split {
+            id: r.get(0)?, athlete_id: r.get(1)?, checkpoint_id: r.get(2)?,
+            course_id: r.get(3)?, timestamp_ms: r.get(4)?, split_time_ms: r.get(5)?,
+            operator_id: r.get(6)?,
+        }))?;
+        Ok(rows.filter_map(Result::ok).collect())
+    }
 }
 
 #[cfg(test)]
@@ -784,7 +965,7 @@ mod tests {
         }).unwrap();
         r.upsert_athlete(&Athlete {
             id: 100, bib_number: 7, first_name: "Mario".into(),
-            last_name: "Rossi".into(), course_id: 1,
+            last_name: "Rossi".into(), course_id: 1, category: None, anonymous: false,
         }).unwrap();
         let list = r.list_athletes_by_course(1).unwrap();
         assert_eq!(list.len(), 1);
@@ -797,7 +978,7 @@ mod tests {
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
                                    started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
-                                     last_name: "b".into(), course_id: 1 }).unwrap();
+                                     last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         let tid = r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
         r.update_finish(tid, 1_500, 500).unwrap();
         let t = r.get_timing(tid).unwrap().unwrap();
@@ -823,7 +1004,7 @@ mod tests {
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
                                    started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
-                                     last_name: "b".into(), course_id: 1 }).unwrap();
+                                     last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         r.insert_timing_running(1, 1, 1_000, "PC-A").unwrap();
         let t = r.find_running_timing_for_athlete(1, "PC-A").unwrap().unwrap();
         assert_eq!(t.athlete_id, Some(1));
@@ -836,7 +1017,7 @@ mod tests {
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
                                    started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
-                                     last_name: "b".into(), course_id: 1 }).unwrap();
+                                     last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         let t1 = r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
         r.update_finish(t1, 200, 100).unwrap();
         assert_eq!(r.fetch_unsynced_timings(10).unwrap().len(), 1);
@@ -883,11 +1064,11 @@ mod tests {
         r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
                                    started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
-                                     last_name: "b".into(), course_id: 1 }).unwrap();
+                                     last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         r.insert_timing_running(1, 1, 100, "PC-A").unwrap();
         assert!(r.delete_athlete(1).is_err());
         r.upsert_athlete(&Athlete { id: 2, bib_number: 2, first_name: "c".into(),
-                                     last_name: "d".into(), course_id: 1 }).unwrap();
+                                     last_name: "d".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         r.delete_athlete(2).unwrap();
         assert_eq!(r.list_athletes().unwrap().len(), 1);
     }
@@ -898,7 +1079,7 @@ mod tests {
         r.upsert_course(&Course { id: -1, name: "Locale".into(), distance_m: None,
                                    started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         r.upsert_athlete(&Athlete { id: -1, bib_number: 1, first_name: "a".into(),
-                                     last_name: "b".into(), course_id: -1 }).unwrap();
+                                     last_name: "b".into(), course_id: -1, category: None, anonymous: false }).unwrap();
         let t = r.insert_timing_running(-1, -1, 100, "PC-A").unwrap();
         r.update_finish(t, 200, 100).unwrap();
         assert!(r.fetch_unsynced_timings(10).unwrap().is_empty());
@@ -932,13 +1113,14 @@ mod tests {
         r.upsert_race(&Race { id: -5, name: "G".into(), scheduled_at_ms: None }).unwrap();
         r.upsert_course(&Course { id: -1, name: "Vecchio".into(), distance_m: None,
             started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
-        r.update_course(-1, "Nuovo", Some(-5)).unwrap();
+        r.update_course(-1, "Nuovo", Some(-5), Some(21000)).unwrap();
         let c = r.list_courses().unwrap();
         assert_eq!(c[0].name, "Nuovo");
         assert_eq!(c[0].race_id, Some(-5));
+        assert_eq!(c[0].distance_m, Some(21000));
         // delete blocked when athletes reference it
         r.upsert_athlete(&Athlete { id: -1, bib_number: 1, first_name: "a".into(),
-            last_name: "b".into(), course_id: -1 }).unwrap();
+            last_name: "b".into(), course_id: -1, category: None, anonymous: false }).unwrap();
         assert!(r.delete_course(-1).is_err());
         r.delete_athlete(-1).unwrap();
         r.delete_course(-1).unwrap();
@@ -957,6 +1139,71 @@ mod tests {
         let c = r.list_courses().unwrap();
         assert_eq!(c[0].name, "21K Trail");
         assert_eq!(c[0].race_id, Some(-1)); // preserved
+    }
+
+    #[test]
+    fn record_split_computes_time_from_course_start() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
+            started_at_ms: Some(1000), scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: 1, bib_number: 5, first_name: "a".into(),
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
+        let cp = Checkpoint { id: -1, course_id: 1, name: "CP1".into(), position: 1 };
+        r.upsert_checkpoint(&cp).unwrap();
+        let s = r.record_split(1, -1, 1, 4000, "PC-A").unwrap();
+        assert_eq!(s.split_time_ms, Some(3000));
+        // re-record overwrites (UNIQUE athlete+checkpoint)
+        let s2 = r.record_split(1, -1, 1, 5000, "PC-A").unwrap();
+        assert_eq!(s2.split_time_ms, Some(4000));
+        assert_eq!(r.list_splits_by_course(1).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn dns_status_is_persisted() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
+        let tid = r.insert_timing_running(1, 1, 0, "PC-A").unwrap();
+        r.update_status(tid, TimingStatus::Dns).unwrap();
+        assert_eq!(r.get_timing(tid).unwrap().unwrap().status, TimingStatus::Dns);
+    }
+
+    #[test]
+    fn backup_then_restore_roundtrips() {
+        let dir = tempfile::tempdir().unwrap();
+        let backup = dir.path().join("backup.db");
+        {
+            let r = fresh();
+            r.upsert_course(&Course { id: 1, name: "21K".into(), distance_m: Some(21000),
+                started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+            r.upsert_athlete(&Athlete { id: 1, bib_number: 9, first_name: "Mara".into(),
+                last_name: "Neri".into(), course_id: 1, category: Some("SF".into()), anonymous: false }).unwrap();
+            r.backup_to(&backup).unwrap();
+        }
+        // fresh empty db, restore from backup
+        let r2 = fresh();
+        assert!(r2.list_athletes().unwrap().is_empty());
+        r2.restore_from(&backup).unwrap();
+        let athletes = r2.list_athletes().unwrap();
+        assert_eq!(athletes.len(), 1);
+        assert_eq!(athletes[0].category.as_deref(), Some("SF"));
+        assert_eq!(r2.list_courses().unwrap()[0].distance_m, Some(21000));
+    }
+
+    #[test]
+    fn athletes_with_finishes_since_filters_by_time() {
+        let r = fresh();
+        r.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
+        r.upsert_athlete(&Athlete { id: 1, bib_number: 1, first_name: "a".into(),
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
+        let tid = r.insert_timing_running(1, 1, 0, "PC-A").unwrap();
+        r.update_finish(tid, 1000, 1000).unwrap();
+        let now = r.clock.now_ms();
+        assert_eq!(r.athletes_with_finishes_since(0).unwrap(), vec![1]);
+        assert!(r.athletes_with_finishes_since(now + 1).unwrap().is_empty());
     }
 
     #[test]

@@ -12,6 +12,7 @@
   let newRaceName = $state('');
   let newRaceDate = $state(''); // yyyy-mm-dd
   let newCourseName = $state('');
+  let newCourseKm = $state('');
   let error = $state<string | null>(null);
   let busy = $state(false);
 
@@ -61,13 +62,28 @@
     if (!newCourseName.trim()) { error = 'nome percorso obbligatorio'; return; }
     busy = true;
     try {
-      await api.saveCourse(null, { name: newCourseName.trim(), race_id: selectedRaceId });
+      const km = parseFloat(newCourseKm.replace(',', '.'));
+      const distance_m = Number.isFinite(km) && km > 0 ? Math.round(km * 1000) : null;
+      await api.saveCourse(null, { name: newCourseName.trim(), race_id: selectedRaceId, distance_m });
       newCourseName = '';
+      newCourseKm = '';
       courses.set(await api.getCourses());
       onChange?.();
     } catch (e: any) {
       error = e?.message ?? JSON.stringify(e);
     } finally { busy = false; }
+  }
+
+  async function updateDistance(c: { id: number; name: string; race_id: number | null }, km: string) {
+    const v = parseFloat(km.replace(',', '.'));
+    const distance_m = Number.isFinite(v) && v > 0 ? Math.round(v * 1000) : null;
+    try {
+      await api.saveCourse(c.id, { name: c.name, race_id: c.race_id, distance_m });
+      courses.set(await api.getCourses());
+      onChange?.();
+    } catch (e: any) {
+      error = e?.message ?? JSON.stringify(e);
+    }
   }
 
   async function removeCourse(id: number) {
@@ -146,15 +162,41 @@
             onkeydown={(e) => e.key === 'Enter' && addCourse()}
           />
         </label>
+        <label class="flex flex-col gap-1 w-28">
+          <span class="hud">KM (opz.)</span>
+          <input
+            bind:value={newCourseKm}
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.1"
+            placeholder="21"
+            class="num"
+            onkeydown={(e) => e.key === 'Enter' && addCourse()}
+          />
+        </label>
         <Button variant="primary" disabled={busy} onclick={addCourse}>+ AGGIUNGI</Button>
       </div>
 
       {#if raceCourses.length > 0}
         <ul class="flex flex-col gap-1">
           {#each raceCourses as c (c.id)}
-            <li class="flex items-center justify-between px-3 py-2 rounded"
+            <li class="flex items-center justify-between px-3 py-2 rounded gap-3"
                 style="background: var(--bg-2)">
-              <span style="color: var(--fg-0)">{c.name}</span>
+              <span style="color: var(--fg-0)" class="flex-1">{c.name}</span>
+              <label class="flex items-center gap-1">
+                <input
+                  type="number"
+                  inputmode="decimal"
+                  min="0"
+                  step="0.1"
+                  class="num w-20"
+                  value={c.distance_m != null ? (c.distance_m / 1000).toString() : ''}
+                  placeholder="km"
+                  onchange={(e) => updateDistance(c, (e.target as HTMLInputElement).value)}
+                />
+                <span class="hud" style="color: var(--fg-3)">KM</span>
+              </label>
               <Button variant="ghost" size="sm" onclick={() => removeCourse(c.id)} title="Rimuovi">✕</Button>
             </li>
           {/each}

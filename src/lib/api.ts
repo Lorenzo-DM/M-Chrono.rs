@@ -2,7 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   Course, Timing, PendingFinish, AthleteRow, DisplaySnapshot,
   AppConfig, DeviceCodeResponse, Athlete, AthleteInput, ImportSummary,
-  Race, RaceInput, CourseInput,
+  Race, RaceInput, CourseInput, Checkpoint, CheckpointInput, Split,
+  ResultRow, ExportSummary,
 } from './types';
 
 export const api = {
@@ -28,6 +29,10 @@ export const api = {
   assignPending: (pendingId: number, bib: number) =>
     invoke<Timing>('assign_pending', { pendingId, bib }),
   withdrawAthlete: (bib: number) => invoke<void>('withdraw_athlete', { bib }),
+  withdrawByAthleteId: (athleteId: number) =>
+    invoke<Timing>('withdraw_by_athlete_id', { athleteId }),
+  markDnsByAthleteId: (athleteId: number) =>
+    invoke<Timing>('mark_dns_by_athlete_id', { athleteId }),
   undoFinish: (timingId: number) => invoke<void>('undo_finish', { timingId }),
   reassignBib: (timingId: number, newBib: number) =>
     invoke<Timing>('reassign_bib', { timingId, newBib }),
@@ -57,7 +62,21 @@ export const api = {
   deleteCourse: (id: number) => invoke<void>('delete_course', { id }),
   getDuplicateGroups: () => invoke<any[]>('get_duplicate_groups'),
   exportResultsXlsx: (path: string) =>
-    invoke<{ path: string; courses_count: number; athletes_count: number }>(
-      'export_results_xlsx', { path }
-    ),
+    invoke<ExportSummary>('export_results_xlsx', { path }),
+  exportResultsCsv: (path: string) =>
+    invoke<ExportSummary>('export_results_csv', { path }),
+  getResultsByCourse: (courseId: number) =>
+    invoke<ResultRow[]>('get_results_by_course', { courseId }),
+  // Checkpoints / splits
+  getCheckpoints: () => invoke<Checkpoint[]>('get_checkpoints'),
+  saveCheckpoint: (id: number | null, input: CheckpointInput) =>
+    invoke<Checkpoint>('save_checkpoint', { id, input }),
+  deleteCheckpoint: (id: number) => invoke<void>('delete_checkpoint', { id }),
+  recordSplit: (checkpointId: number, bib: number) =>
+    invoke<Split>('record_split', { checkpointId, bib }),
+  getSplitsByCourse: (courseId: number) =>
+    invoke<Split[]>('get_splits_by_course', { courseId }),
+  // Backup / restore
+  backupDatabase: (path: string) => invoke<string>('backup_database', { path }),
+  restoreDatabase: (path: string) => invoke<void>('restore_database', { path }),
 };

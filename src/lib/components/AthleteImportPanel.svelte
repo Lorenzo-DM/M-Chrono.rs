@@ -68,7 +68,7 @@
   </div>
 
   <div class="hud" style="color: var(--fg-3)">
-    Colonne: pettorale, nome, cognome, percorso — intestazione opzionale
+    Colonne: pettorale, nome, cognome, percorso, categoria (opz.) — intestazione opzionale
   </div>
 
   {#if $config?.sync_enabled && !$isAuthenticated}

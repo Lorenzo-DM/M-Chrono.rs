@@ -14,6 +14,7 @@
   let bib = $state(athlete ? String(athlete.bib_number) : '');
   let firstName = $state(athlete?.first_name ?? '');
   let lastName = $state(athlete?.last_name ?? '');
+  let category = $state(athlete?.category ?? '');
   let courseSel = $state<string>(
     athlete ? String(athlete.course_id)
             : ($courses[0] ? String($courses[0].id) : NEW_COURSE)
@@ -37,6 +38,8 @@
         last_name: lastName.trim(),
         course_id: isNew ? null : Number(courseSel),
         course_name: isNew ? newCourseName.trim() : null,
+        category: category.trim() || null,
+        anonymous: athlete?.anonymous ?? false,
       });
       courses.set(await api.getCourses());
       onClose(true);
@@ -80,6 +83,11 @@
           <input bind:value={lastName} autocomplete="off" />
         </label>
       </div>
+
+      <label class="flex flex-col gap-1">
+        <span class="hud">CATEGORIA (opzionale)</span>
+        <input bind:value={category} autocomplete="off" placeholder="es. M40, SF, U23" />
+      </label>
 
       <label class="flex flex-col gap-1">
         <span class="hud">PERCORSO</span>

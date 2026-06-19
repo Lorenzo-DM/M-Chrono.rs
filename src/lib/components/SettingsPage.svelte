@@ -9,7 +9,8 @@
     import AthleteImportPanel from "./AthleteImportPanel.svelte";
     import AthleteFormModal from "./AthleteFormModal.svelte";
     import RaceSetupPanel from "./RaceSetupPanel.svelte";
-    import { save as saveDialog } from "@tauri-apps/plugin-dialog";
+    import CheckpointsPanel from "./CheckpointsPanel.svelte";
+    import { isMuted, setMuted } from "../sound";
     import type { AppConfig, Athlete } from "../types";
 
     let { onBack: _onBack }: { onBack?: () => void } = $props();
@@ -36,6 +37,7 @@
     let editingAthlete = $state<Athlete | null>(null);
     let showAthleteForm = $state(false);
     let athleteError = $state<string | null>(null);
+    let soundOn = $state(!isMuted());
 
     $effect(() => {
         api.isAuthenticated().then((b) => {
@@ -120,21 +122,9 @@
         }
     }
 
-    async function doExport() {
-        const date = new Date().toISOString().slice(0, 10);
-        const path = await saveDialog({
-            defaultPath: `risultati_${date}.xlsx`,
-            filters: [{ name: "Excel", extensions: ["xlsx"] }],
-        });
-        if (!path) return;
-        try {
-            const s = await api.exportResultsXlsx(path);
-            alert(
-                `Esportati ${s.athletes_count} atleti su ${s.courses_count} percorsi`,
-            );
-        } catch (e: any) {
-            alert(e?.message ?? String(e));
-        }
+    function toggleSound(on: boolean) {
+        soundOn = on;
+        setMuted(!on);
     }
 </script>
 
@@ -191,12 +181,28 @@
                 value={$themeMode}
                 onChange={(v) => themeMode.set(v as ThemeMode)}
             />
+            <div class="hud mt-4 mb-2">SUONO</div>
+            <SegmentedControl
+                ariaLabel="Suono"
+                options={[
+                    { value: 'on', label: 'On', title: 'Feedback sonoro attivo' },
+                    { value: 'off', label: 'Off', title: 'Silenzioso' },
+                ]}
+                value={soundOn ? 'on' : 'off'}
+                onChange={(v) => toggleSound(v === 'on')}
+            />
         </section>
 
         <!-- Race + courses -->
         <section class="panel p-4 col-span-12">
             <div class="hud mb-4">GARA / PERCORSI</div>
             <RaceSetupPanel />
+        </section>
+
+        <!-- Checkpoints -->
+        <section class="panel p-4 col-span-12">
+            <div class="hud mb-4">CHECKPOINT / TEMPI PARZIALI</div>
+            <CheckpointsPanel />
         </section>
 
         <!-- Athletes -->
@@ -229,6 +235,7 @@
                                 <th class="px-3 py-2">PETT.</th>
                                 <th class="px-3 py-2">NOME</th>
                                 <th class="px-3 py-2">COGNOME</th>
+                                <th class="px-3 py-2">CAT.</th>
                                 <th class="px-3 py-2">PERCORSO</th>
                                 <th class="px-3 py-2"></th>
                                 <th class="px-3 py-2"></th>
@@ -238,8 +245,13 @@
                             {#each filteredAthletes as a (a.id)}
                                 <tr class="border-t" style="border-color: var(--line-1)">
                                     <td class="px-3 py-1.5 num" style="color: var(--fg-0)">{a.bib_number}</td>
-                                    <td class="px-3 py-1.5" style="color: var(--fg-1)">{a.first_name}</td>
+                                    <td class="px-3 py-1.5" style="color: var(--fg-1)">
+                                        {#if a.anonymous}
+                                            <span class="hud" style="color: var(--accent-pending)">SENZA NOME</span>
+                                        {:else}{a.first_name}{/if}
+                                    </td>
                                     <td class="px-3 py-1.5" style="color: var(--fg-1)">{a.last_name}</td>
+                                    <td class="px-3 py-1.5" style="color: var(--fg-2)">{a.category ?? ''}</td>
                                     <td class="px-3 py-1.5" style="color: var(--fg-2)">
                                         {courseNames.get(a.course_id) ?? a.course_id}
                                     </td>
@@ -371,11 +383,7 @@
             {/if}
         </div>
 
-        <!-- Export -->
-        <section class="panel p-4 col-span-12">
-            <div class="hud mb-3">EXPORT</div>
-            <Button onclick={doExport}>ESPORTA RISULTATI XLSX</Button>
-        </section>
+        <!-- Export moved to its own EXPORT view in the top nav. -->
     </div>
 </div>
 

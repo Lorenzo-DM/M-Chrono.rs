@@ -147,7 +147,7 @@
       style="top: {dropPos.top}px; left: {dropPos.left}px; width: {dropPos.width}px;"
     >
       {#each filtered as a, i (a.id)}
-        {@const anonAthlete = a.first_name === `#${a.bib_number}` && a.last_name === ''}
+        {@const anonAthlete = a.anonymous || (!a.first_name && !a.last_name)}
         <li>
           <button
             class="drop-item"

@@ -27,9 +27,11 @@ pub struct RawRow {
     pub first_name: String,
     pub last_name: String,
     pub course_name: String,
+    pub category: Option<String>,
 }
 
-/// Expected columns, in order: pettorale | nome | cognome | percorso.
+/// Expected columns, in order: pettorale | nome | cognome | percorso | categoria.
+/// The category column is optional.
 /// A header row is auto-skipped when the first cell of row 1 is not an integer.
 pub fn import_file(repo: &Repo, path: &Path) -> AppResult<ImportSummary> {
     let ext = path
@@ -75,7 +77,8 @@ pub fn parse_xlsx(path: &Path) -> AppResult<(Vec<RawRow>, Vec<ImportRowError>)> 
         let first = cells.get(1).map(cell_to_string).unwrap_or_default();
         let last = cells.get(2).map(cell_to_string).unwrap_or_default();
         let course = cells.get(3).map(cell_to_string).unwrap_or_default();
-        match build_row(row_num, &bib_raw, &first, &last, &course) {
+        let category = cells.get(4).map(cell_to_string).unwrap_or_default();
+        match build_row(row_num, &bib_raw, &first, &last, &course, &category) {
             Ok(r) => rows.push(r),
             Err(e) => errors.push(e),
         }
@@ -121,7 +124,8 @@ pub fn parse_csv(path: &Path) -> AppResult<(Vec<RawRow>, Vec<ImportRowError>)> {
         let first = rec.get(1).unwrap_or("").to_string();
         let last = rec.get(2).unwrap_or("").to_string();
         let course = rec.get(3).unwrap_or("").to_string();
-        match build_row(row_num, &bib_raw, &first, &last, &course) {
+        let category = rec.get(4).unwrap_or("").to_string();
+        match build_row(row_num, &bib_raw, &first, &last, &course, &category) {
             Ok(r) => rows.push(r),
             Err(e) => errors.push(e),
         }
@@ -135,6 +139,7 @@ fn build_row(
     first: &str,
     last: &str,
     course: &str,
+    category: &str,
 ) -> Result<RawRow, ImportRowError> {
     let bib = bib_raw.trim().parse::<i64>().map_err(|_| ImportRowError {
         row: row_num,
@@ -155,7 +160,11 @@ fn build_row(
     if course_name.is_empty() {
         return Err(ImportRowError { row: row_num, message: "percorso mancante".into() });
     }
-    Ok(RawRow { row_num, bib, first_name, last_name, course_name })
+    let category = {
+        let c = category.trim();
+        if c.is_empty() { None } else { Some(c.to_string()) }
+    };
+    Ok(RawRow { row_num, bib, first_name, last_name, course_name, category })
 }
 
 fn cell_to_string(c: &Data) -> String {
@@ -235,6 +244,8 @@ pub fn apply_rows(repo: &Repo, rows: Vec<RawRow>) -> AppResult<ImportSummary> {
                     first_name: r.first_name,
                     last_name: r.last_name,
                     course_id,
+                    category: r.category.or(existing.category),
+                    anonymous: existing.anonymous,
                 })?;
                 summary.updated += 1;
             }
@@ -245,6 +256,8 @@ pub fn apply_rows(repo: &Repo, rows: Vec<RawRow>) -> AppResult<ImportSummary> {
                     first_name: r.first_name,
                     last_name: r.last_name,
                     course_id,
+                    category: r.category,
+                    anonymous: false,
                 })?;
                 next_athlete_id -= 1;
                 summary.inserted += 1;
@@ -272,6 +285,7 @@ mod tests {
             first_name: first.into(),
             last_name: last.into(),
             course_name: course.into(),
+            category: None,
         }
     }
 
@@ -311,7 +325,7 @@ mod tests {
         }).unwrap();
         r.upsert_athlete(&Athlete {
             id: 100, bib_number: 7, first_name: "Old".into(),
-            last_name: "Name".into(), course_id: 5,
+            last_name: "Name".into(), course_id: 5, category: None, anonymous: false,
         }).unwrap();
         let s = apply_rows(&r, vec![row(1, 7, "Mario", "Rossi", "21K")]).unwrap();
         assert_eq!(s.updated, 1);
@@ -349,11 +363,12 @@ mod tests {
 
     #[test]
     fn build_row_validates() {
-        assert!(build_row(1, "abc", "a", "b", "21K").is_err());
-        assert!(build_row(1, "-3", "a", "b", "21K").is_err());
-        assert!(build_row(1, "5", "", "", "21K").is_err());
-        assert!(build_row(1, "5", "a", "b", " ").is_err());
-        assert!(build_row(1, " 5 ", "a", "", "21K").is_ok());
+        assert!(build_row(1, "abc", "a", "b", "21K", "").is_err());
+        assert!(build_row(1, "-3", "a", "b", "21K", "").is_err());
+        assert!(build_row(1, "5", "", "", "21K", "").is_err());
+        assert!(build_row(1, "5", "a", "b", " ", "").is_err());
+        assert!(build_row(1, " 5 ", "a", "", "21K", "").is_ok());
+        assert_eq!(build_row(1, "5", "a", "b", "21K", " M40 ").unwrap().category.as_deref(), Some("M40"));
     }
 
     #[test]

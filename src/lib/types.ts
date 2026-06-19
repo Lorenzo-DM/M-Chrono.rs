@@ -1,4 +1,4 @@
-export type TimingStatus = 'Registered' | 'Running' | 'Finished' | 'Withdrawn';
+export type TimingStatus = 'Registered' | 'Running' | 'Finished' | 'Withdrawn' | 'DNS';
 
 export interface Race {
   id: number;
@@ -24,6 +24,7 @@ export interface RaceInput {
 export interface CourseInput {
   name: string;
   race_id: number | null;
+  distance_m?: number | null;
 }
 
 export interface Athlete {
@@ -32,6 +33,54 @@ export interface Athlete {
   first_name: string;
   last_name: string;
   course_id: number;
+  category: string | null;
+  anonymous: boolean;
+}
+
+export interface Checkpoint {
+  id: number;
+  course_id: number;
+  name: string;
+  position: number;
+}
+
+export interface Split {
+  id: number;
+  athlete_id: number;
+  checkpoint_id: number;
+  course_id: number;
+  timestamp_ms: number;
+  split_time_ms: number | null;
+  operator_id: string;
+}
+
+export interface ResultRow {
+  timing_id: number;
+  athlete_id: number | null;
+  bib_number: number | null;
+  first_name: string | null;
+  last_name: string | null;
+  category: string | null;
+  course_id: number;
+  course_name: string;
+  start_timestamp_ms: number | null;
+  finish_timestamp_ms: number | null;
+  total_time_ms: number | null;
+  status: TimingStatus;
+  operator_id: string;
+  duplicate_flagged: boolean;
+}
+
+export interface CheckpointInput {
+  course_id: number;
+  name: string;
+  position: number;
+}
+
+export interface ExportSummary {
+  path: string;
+  courses_count: number;
+  athletes_count: number;
 }
 
 export interface Timing {
@@ -125,4 +174,6 @@ export interface AthleteInput {
   last_name: string;
   course_id: number | null;
   course_name: string | null;
+  category?: string | null;
+  anonymous?: boolean;
 }

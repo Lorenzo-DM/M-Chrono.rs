@@ -7,6 +7,7 @@ const MIGRATIONS: &[(i32, &str)] = &[
     (1, include_str!("../../migrations/0001_init.sql")),
     (2, include_str!("../../migrations/0002_course_ended_at.sql")),
     (3, include_str!("../../migrations/0003_races.sql")),
+    (4, include_str!("../../migrations/0004_categories_splits.sql")),
 ];
 
 pub fn run(conn: &Connection) -> AppResult<()> {

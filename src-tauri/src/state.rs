@@ -76,7 +76,7 @@ mod tests {
         repo.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
                                       started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         repo.upsert_athlete(&Athlete { id: 10, bib_number: 7, first_name: "a".into(),
-                                        last_name: "b".into(), course_id: 1 }).unwrap();
+                                        last_name: "b".into(), course_id: 1, category: None, anonymous: false }).unwrap();
         let s = bootstrap_from_db(&repo, &SystemClock).unwrap();
         assert!(s.athletes_by_bib.contains_key(&7));
         assert!(s.courses.contains_key(&1));

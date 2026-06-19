@@ -1,5 +1,6 @@
 use crate::db::repo::{Repo, ResultRow};
 use crate::error::{AppError, AppResult};
+use crate::export::{fmt_clock, fmt_hms};
 use rust_xlsxwriter::{Color, Format, Workbook, Worksheet};
 use std::path::Path;
 
@@ -15,10 +16,10 @@ const HEADERS: [&str; 11] = [
     "Pettorale",
     "Cognome",
     "Nome",
+    "Categoria",
     "Percorso",
-    "Start (ms)",
-    "Finish (ms)",
-    "Totale (ms)",
+    "Arrivo",
+    "Tempo",
     "Status",
     "Operatore",
     "Flag",
@@ -112,14 +113,16 @@ fn write_data_row(
         };
     }
 
+    let arrivo = fmt_clock(r.finish_timestamp_ms);
+    let tempo = fmt_hms(r.total_time_ms);
     wcell!(0u16, pos as i64);
     wcell!(1u16, r.bib_number.unwrap_or(0));
     wcell!(2u16, r.last_name.as_deref().unwrap_or(""));
     wcell!(3u16, r.first_name.as_deref().unwrap_or(""));
-    wcell!(4u16, r.course_name.as_str());
-    wcell!(5u16, r.start_timestamp_ms.unwrap_or(0));
-    wcell!(6u16, r.finish_timestamp_ms.unwrap_or(0));
-    wcell!(7u16, r.total_time_ms.unwrap_or(0));
+    wcell!(4u16, r.category.as_deref().unwrap_or(""));
+    wcell!(5u16, r.course_name.as_str());
+    wcell!(6u16, arrivo.as_str());
+    wcell!(7u16, tempo.as_str());
     wcell!(8u16, r.status.as_str());
     wcell!(9u16, r.operator_id.as_str());
     wcell!(10u16, flag_str.as_str());
@@ -155,6 +158,8 @@ mod tests {
             first_name: "M".into(),
             last_name: "R".into(),
             course_id: 1,
+            category: None,
+            anonymous: false,
         })
         .unwrap();
         let tid = repo

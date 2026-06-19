@@ -7,6 +7,8 @@ export type AppEvents = {
   'course:reset': { course_id: number };
   'athlete:finished': Timing;
   'pending:captured': PendingFinish;
+  'split:recorded': any;
+  'data:changed': null;
   'sync:status': SyncStatus;
   'network:status': { online: boolean };
   'auth:device_code': any;

@@ -53,7 +53,14 @@ pub async fn push_timings(
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         return Err(AppError::Unauthorized);
     }
-    let resp = resp.error_for_status().map_err(|e| AppError::Api(format!("push: {e}")))?;
+    let resp = match resp.error_for_status() {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = format!("push: {e}");
+            for t in &batch { let _ = repo.record_sync_error_timing(t.id, &msg); }
+            return Err(AppError::Api(msg));
+        }
+    };
     let acks: Vec<PushAck> = resp.json().await?;
     for ack in &acks {
         repo.mark_timing_synced(ack.local_id, ack.remote_id)?;
@@ -82,7 +89,14 @@ pub async fn push_pending(
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         return Err(AppError::Unauthorized);
     }
-    let resp = resp.error_for_status().map_err(|e| AppError::Api(format!("push pending: {e}")))?;
+    let resp = match resp.error_for_status() {
+        Ok(r) => r,
+        Err(e) => {
+            let msg = format!("push pending: {e}");
+            for p in &batch { let _ = repo.record_sync_error_pending(p.id); }
+            return Err(AppError::Api(msg));
+        }
+    };
     let acks: Vec<PushAck> = resp.json().await?;
     for ack in &acks {
         repo.mark_pending_synced(ack.local_id, ack.remote_id)?;
@@ -110,7 +124,7 @@ mod tests {
         }).unwrap();
         repo.upsert_athlete(&Athlete {
             id: 1, bib_number: 1, first_name: "a".into(),
-            last_name: "b".into(), course_id: 1,
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false,
         }).unwrap();
         let tid = repo.insert_timing_running(1, 1, 100, "PC-A").unwrap();
         repo.update_finish(tid, 200, 100).unwrap();

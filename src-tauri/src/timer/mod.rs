@@ -181,6 +181,40 @@ pub async fn withdraw_athlete(
     Ok(())
 }
 
+/// Set a running athlete's timing to Withdrawn or DNS (Did Not Start).
+pub async fn set_timing_status_by_athlete(
+    state: &SharedState,
+    repo: &Repo,
+    athlete_id: i64,
+    operator_id: &str,
+    status: TimingStatus,
+) -> AppResult<Timing> {
+    let mut s = state.write().await;
+    let timing = repo.find_running_timing_for_athlete(athlete_id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState(
+            format!("nessun timing in corso per atleta {}", athlete_id)))?;
+    repo.update_status(timing.id, status)?;
+    let updated = repo.get_timing(timing.id)?.expect("updated");
+    s.timings.insert(updated.id, updated.clone());
+    Ok(updated)
+}
+
+/// Record an intermediate split for an athlete at a checkpoint (immediate,
+/// timestamped now).
+pub async fn record_split(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    athlete_id: i64,
+    checkpoint_id: i64,
+    course_id: i64,
+    operator_id: &str,
+) -> AppResult<crate::models::Split> {
+    let ts_ms = clock.now_ms();
+    let _guard = state.read().await; // serialize against concurrent state writers
+    repo.record_split(athlete_id, checkpoint_id, course_id, ts_ms, operator_id)
+}
+
 pub async fn undo_finish(
     state: &SharedState,
     repo: &Repo,
@@ -406,7 +440,7 @@ mod tests {
                                       started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         for i in 1..=3 {
             repo.upsert_athlete(&Athlete {
-                id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1
+                id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1, category: None, anonymous: false,
             }).unwrap();
         }
         let state = new_shared();

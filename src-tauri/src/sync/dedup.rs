@@ -73,7 +73,7 @@ mod tests {
         }).unwrap();
         repo.upsert_athlete(&Athlete {
             id: 1, bib_number: 1, first_name: "a".into(),
-            last_name: "b".into(), course_id: 1,
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false,
         }).unwrap();
         repo
     }
