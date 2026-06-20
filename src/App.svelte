@@ -103,7 +103,7 @@
         class="text-2xl font-semibold"
         style="color: var(--fg-0); letter-spacing: -0.01em"
       >
-        TrailTrace<span style="color: var(--accent-running)">·</span>Chrono
+        M-Chrono
       </div>
       <div class="hud mt-2" style="color: var(--fg-3)">CARICAMENTO…</div>
     </div>

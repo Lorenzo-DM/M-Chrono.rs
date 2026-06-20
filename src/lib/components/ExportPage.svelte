@@ -54,7 +54,7 @@
   async function backup() {
     reset();
     const path = await saveDialog({
-      defaultPath: `trailtrace_backup_${today()}.db`,
+      defaultPath: `mchrono_backup_${today()}.db`,
       filters: [{ name: 'Database', extensions: ['db'] }],
     });
     if (!path) return;

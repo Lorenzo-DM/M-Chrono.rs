@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "trailtrace-stopwatch",
+  "productName": "M-Chrono",
   "version": "0.1.0",
-  "identifier": "com.trailtrace.stopwatch",
+  "identifier": "com.mchrono.app",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Trail Race Timing",
+        "title": "M-Chrono",
         "width": 1280,
         "height": 800,
         "minWidth": 360,
