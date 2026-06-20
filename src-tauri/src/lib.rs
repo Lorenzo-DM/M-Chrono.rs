@@ -37,7 +37,7 @@ fn init_tracing(log_dir: &std::path::Path) {
     Box::leak(Box::new(guard));
 
     let filter = tracing_subscriber::EnvFilter::from_default_env()
-        .add_directive("trailtrace_stopwatch_lib=info".parse().unwrap());
+        .add_directive("m_chrono_lib=info".parse().unwrap());
 
     tracing_subscriber::registry()
         .with(filter)
