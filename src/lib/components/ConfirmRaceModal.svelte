@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Course } from '../types';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert } from 'lucide-svelte';
 
   type Variant = 'end' | 'restart';
 
@@ -24,7 +25,7 @@
 
   const COPY = {
     end: {
-      title: '⚠ TERMINA GARA',
+      title: 'TERMINA GARA',
       titleColor: 'var(--accent-finish)',
       lead: 'Stai per <strong>terminare definitivamente</strong> il percorso:',
       body:
@@ -113,7 +114,7 @@
       />
 
       {#if error}
-        <div class="hud mt-3" style="color: var(--accent-finish)">⚠ {error}</div>
+        <div class="hud mt-3" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
       {/if}
 
       <div class="flex gap-2 mt-6">

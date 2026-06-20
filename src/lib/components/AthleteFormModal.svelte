@@ -4,6 +4,7 @@
   import { api } from '../api';
   import { courses } from '../stores';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert } from 'lucide-svelte';
 
   let { athlete = null, onClose }: {
     athlete?: Athlete | null;
@@ -108,7 +109,7 @@
       {/if}
 
       {#if error}
-        <div class="hud" style="color: var(--accent-finish)">⚠ {error}</div>
+        <div class="hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
       {/if}
 
       <div class="flex gap-2 mt-2">

@@ -3,6 +3,7 @@
   import { config, courses, isAuthenticated } from '../stores';
   import type { ImportSummary } from '../types';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert, Check } from 'lucide-svelte';
   import AthleteFormModal from './AthleteFormModal.svelte';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
@@ -82,14 +83,14 @@
   {/if}
 
   {#if importError}
-    <div class="hud" style="color: var(--accent-finish)">⚠ {importError}</div>
+    <div class="hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {importError}</div>
   {/if}
 
   {#if summary}
     <div class="panel p-4">
       <div class="flex flex-wrap items-center gap-4">
         <span class="hud-strong" style="color: var(--accent-start)">
-          ✓ {summary.inserted} inseriti
+          <Check size={14} /> {summary.inserted} inseriti
         </span>
         <span class="hud-strong" style="color: var(--fg-1)">
           {summary.updated} aggiornati
@@ -101,7 +102,7 @@
         {/if}
         {#if summary.errors.length > 0}
           <span class="hud-strong" style="color: var(--accent-pending)">
-            ⚠ {summary.errors.length} righe scartate
+            <TriangleAlert size={14} /> {summary.errors.length} righe scartate
           </span>
         {/if}
       </div>

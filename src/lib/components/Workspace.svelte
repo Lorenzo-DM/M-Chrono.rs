@@ -4,6 +4,7 @@
   import { normalizeVisibleLanes, toggleLane } from '../splitLanes';
   import LaneCard from './LaneCard.svelte';
   import type { Course } from '../types';
+  import { CircleDot, Circle } from 'lucide-svelte';
 
   let effectiveLayout = $derived.by(() => ($breakpoint === 'mobile' ? 'tabs' : $layoutMode));
 
@@ -95,7 +96,7 @@
           style="color: {on ? 'var(--accent-running)' : 'var(--fg-3)'}; cursor: pointer"
           onclick={() => toggleSplitCourse(c.id)}
         >
-          {on ? '●' : '○'} {c.name}
+          {#if on}<CircleDot size={12} />{:else}<Circle size={12} />{/if} {c.name}
         </button>
       {/each}
       <div class="hud ml-auto" style="color: var(--fg-3)">max 4 corsie</div>

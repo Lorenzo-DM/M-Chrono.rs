@@ -10,6 +10,7 @@
   import ConfirmModal from './ConfirmModal.svelte';
   import Button from '../ui/Button.svelte';
   import BibCombobox from './BibCombobox.svelte';
+  import { Play, Flag, Check, X, ArrowLeftRight, Undo2 } from 'lucide-svelte';
 
   let {
     course,
@@ -379,7 +380,7 @@
             showEndModal = true;
           }}
         >
-          ■ TERMINA
+          <Flag size={14} /> TERMINA
         </Button>
       {/if}
 
@@ -409,8 +410,8 @@
       class="chronodial num"
       data-state={started ? 'running' : 'idle'}
       style="font-size: {size === 'full'
-        ? 'clamp(2rem, 18cqi, 7rem)'
-        : 'clamp(1.5rem, 18cqi, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
+        ? 'clamp(0.85rem, 12cqi, 7rem)'
+        : 'clamp(0.7rem, 12cqi, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
     >
       {formatMsToHms(elapsed)}
     </div>
@@ -426,7 +427,7 @@
         disabled={busy}
         onclick={doStart}
       >
-        ▶ START PERCORSO
+        <Play size={16} /> START PERCORSO
       </Button>
     {:else if ended}
       <Button
@@ -434,7 +435,7 @@
         style="padding: 1rem 1rem; color: var(--fg-3); cursor: default"
         disabled
       >
-        ■ GARA TERMINATA
+        <Flag size={16} /> GARA TERMINATA
       </Button>
     {:else}
       <div class="flex gap-2">
@@ -552,7 +553,7 @@
                     class="btn-row"
                     onclick={() => (movingPendingId = null)}
                     title="Annulla"
-                  >✕</button>
+                  ><X size={14} /></button>
                 </div>
               {:else}
                 <form
@@ -578,7 +579,7 @@
                     title="Assegna pettorale"
                     aria-label="Assegna pettorale"
                   >
-                    ✓
+                    <Check size={14} />
                   </button>
                   {#if $courses.length > 1}
                     <button
@@ -590,7 +591,7 @@
                         e.stopPropagation();
                         movingPendingId = r.p.id;
                       }}
-                    >↔</button>
+                    ><ArrowLeftRight size={14} /></button>
                   {/if}
                   <button
                     type="button"
@@ -602,7 +603,7 @@
                       doDeletePending(r.p.id, r.p.finish_timestamp_ms);
                     }}
                   >
-                    ✕
+                    <X size={14} />
                   </button>
                 </form>
               {/if}
@@ -636,13 +637,13 @@
                     autocomplete="off"
                   />
                   <span class="row-hint">nuovo pettorale</span>
-                  <button type="submit" class="btn-row btn-row-confirm" title="Salva">✓</button>
+                  <button type="submit" class="btn-row btn-row-confirm" title="Salva"><Check size={14} /></button>
                   <button
                     type="button"
                     class="btn-row"
                     title="Annulla"
                     onclick={(e) => { e.stopPropagation(); cancelEditBib(); }}
-                  >⌫</button>
+                  ><Undo2 size={14} /></button>
                 </form>
               {:else if isEditingName}
                 <form
@@ -665,13 +666,13 @@
                     placeholder="Cognome"
                     autocomplete="off"
                   />
-                  <button type="submit" class="btn-row btn-row-confirm" title="Salva">✓</button>
+                  <button type="submit" class="btn-row btn-row-confirm" title="Salva"><Check size={14} /></button>
                   <button
                     type="button"
                     class="btn-row"
                     title="Annulla"
                     onclick={(e) => { e.stopPropagation(); cancelEditAthleteName(); }}
-                  >⌫</button>
+                  ><Undo2 size={14} /></button>
                 </form>
               {:else}
                 <div class="row-main">
@@ -711,7 +712,7 @@
                         e.stopPropagation();
                         doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
                       }}
-                    >✕</button>
+                    ><X size={14} /></button>
                   {/if}
                 </div>
               {/if}

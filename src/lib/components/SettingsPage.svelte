@@ -4,6 +4,7 @@
     import { themeMode } from "../theme";
     import type { ThemeMode } from "../theme";
     import Button from "../ui/Button.svelte";
+    import { TriangleAlert, Check, X } from 'lucide-svelte';
     import SegmentedControl from "../ui/SegmentedControl.svelte";
     import DeviceLoginModal from "./DeviceLoginModal.svelte";
     import AthleteImportPanel from "./AthleteImportPanel.svelte";
@@ -173,7 +174,7 @@
                 {saving ? "SALVATAGGIO…" : "SALVA CONFIGURAZIONE"}
             </Button>
             {#if saved}
-                <span class="hud" style="color: var(--accent-start)">✓ SALVATO</span>
+                <span class="hud" style="color: var(--accent-start)"><Check size={14} /> SALVATO</span>
             {/if}
         </div>
     {/snippet}
@@ -266,7 +267,7 @@
 
             {#if athleteError}
                 <div class="hud mt-3" style="color: var(--accent-finish)">
-                    ⚠ {athleteError}
+                    <TriangleAlert size={14} /> {athleteError}
                 </div>
             {/if}
 
@@ -316,7 +317,7 @@
                                     </td>
                                     <td class="px-3 py-1.5 text-right whitespace-nowrap">
                                         <Button variant="ghost" size="sm" onclick={() => editAthlete(a)} title="Modifica">✎</Button>
-                                        <Button variant="ghost" size="sm" onclick={() => removeAthlete(a)} title="Elimina">✕</Button>
+                                        <Button variant="ghost" size="sm" onclick={() => removeAthlete(a)} title="Elimina"><X size={14} /></Button>
                                     </td>
                                 </tr>
                             {/each}

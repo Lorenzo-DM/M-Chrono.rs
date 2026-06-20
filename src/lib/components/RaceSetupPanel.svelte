@@ -3,6 +3,7 @@
   import { courses } from '../stores';
   import type { Race } from '../types';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert, X } from 'lucide-svelte';
 
   let { onChange }: { onChange?: () => void } = $props();
 
@@ -197,7 +198,7 @@
                 />
                 <span class="hud" style="color: var(--fg-3)">KM</span>
               </label>
-              <Button variant="ghost" size="sm" onclick={() => removeCourse(c.id)} title="Rimuovi">✕</Button>
+              <Button variant="ghost" size="sm" onclick={() => removeCourse(c.id)} title="Rimuovi"><X size={14} /></Button>
             </li>
           {/each}
         </ul>
@@ -210,6 +211,6 @@
   {/if}
 
   {#if error}
-    <div class="hud" style="color: var(--accent-finish)">⚠ {error}</div>
+    <div class="hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
   {/if}
 </div>

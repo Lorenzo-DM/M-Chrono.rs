@@ -4,6 +4,7 @@
   import { courses } from '../stores';
   import type { Checkpoint } from '../types';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert, X } from 'lucide-svelte';
 
   let checkpoints = $state<Checkpoint[]>([]);
   let selectedCourseId = $state<number | null>(null);
@@ -96,7 +97,7 @@
           <span style="color: var(--fg-0)">
             <span class="num" style="color: var(--fg-3)">{cp.position}.</span> {cp.name}
           </span>
-          <Button variant="ghost" size="sm" onclick={() => remove(cp.id)} title="Rimuovi">✕</Button>
+          <Button variant="ghost" size="sm" onclick={() => remove(cp.id)} title="Rimuovi"><X size={14} /></Button>
         </li>
       {/each}
     </ul>
@@ -105,6 +106,6 @@
   {/if}
 
   {#if error}
-    <div class="hud" style="color: var(--accent-finish)">⚠ {error}</div>
+    <div class="hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
   {/if}
 </div>

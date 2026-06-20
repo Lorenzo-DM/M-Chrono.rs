@@ -5,6 +5,7 @@
   import { formatMsToHms } from '../format';
   import { courses } from '../stores';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert } from 'lucide-svelte';
   import BibCombobox from './BibCombobox.svelte';
 
   let { pending, onClose }: { pending: PendingFinish; onClose: () => void } = $props();
@@ -76,7 +77,7 @@
       />
 
       {#if error}
-        <div class="hud mt-3" style="color: var(--accent-finish)">⚠ {error}</div>
+        <div class="hud mt-3" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
       {/if}
 
       <div class="flex gap-2 mt-6">

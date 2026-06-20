@@ -3,6 +3,7 @@
   import { api } from '../api';
   import { formatMsToHms } from '../format';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert, Check } from 'lucide-svelte';
 
   let { onClose }: { onClose: () => void } = $props();
   let groups = $state<any[]>([]);
@@ -26,7 +27,7 @@
   <div class="panel-2 w-full max-w-4xl mx-auto">
     <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
       <div class="flex items-center gap-3">
-        <span style="color: var(--accent-dup)">⚠</span>
+        <span style="color: var(--accent-dup)"><TriangleAlert size={16} /></span>
         <div class="hud-strong" style="color: var(--accent-dup)">DUPLICATI DA REVISIONARE</div>
         <div class="hud">·</div>
         <div class="hud">{groups.length}</div>
@@ -41,7 +42,7 @@
       {#if loading}
         <div class="hud" style="color: var(--fg-2)">CARICAMENTO…</div>
       {:else if groups.length === 0}
-        <div class="hud" style="color: var(--accent-start)">✓ NESSUN DUPLICATO FLAGGATO</div>
+        <div class="hud" style="color: var(--accent-start)"><Check size={14} /> NESSUN DUPLICATO FLAGGATO</div>
       {:else}
         <div class="flex flex-col gap-3">
           {#each groups as g (g.group_id)}

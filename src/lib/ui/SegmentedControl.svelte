@@ -1,7 +1,12 @@
 <script lang="ts">
+  import { Timer } from 'lucide-svelte';
+
+  type LucideIcon = typeof Timer;
+
   type Option = {
     value: string;
     label: string;
+    icon?: LucideIcon;
     title?: string;
   };
 
@@ -29,11 +34,16 @@
       data-active={value === option.value}
       role="radio"
       aria-checked={value === option.value}
-      aria-label={option.label ?? option.value}
+      aria-label={option.title ?? option.label ?? option.value}
       title={option.title ?? option.label ?? option.value}
-    onclick={() => onChange(option.value)}
+      onclick={() => onChange(option.value)}
     >
-      {option.label}
+      {#if option.icon}
+        {@const Icon = option.icon}
+        <Icon size={14} />
+      {:else}
+        {option.label}
+      {/if}
     </button>
   {/each}
 </div>

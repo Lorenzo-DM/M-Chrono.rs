@@ -6,6 +6,7 @@
   import { formatMsToHms } from '../format';
   import type { ResultRow } from '../types';
   import Button from '../ui/Button.svelte';
+  import { TriangleAlert } from 'lucide-svelte';
   import ConfirmModal from './ConfirmModal.svelte';
 
   let selectedCourseId = $state<number | null>(null);
@@ -164,7 +165,7 @@
   </div>
 
   {#if error}
-    <div class="hud mb-3" style="color: var(--accent-finish)">⚠ {error}</div>
+    <div class="hud mb-3" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
   {/if}
 
   {#if busy && rows.length === 0}

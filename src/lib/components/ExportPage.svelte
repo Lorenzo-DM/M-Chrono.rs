@@ -3,6 +3,7 @@
   import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
   import Button from '../ui/Button.svelte';
   import ConfirmModal from './ConfirmModal.svelte';
+  import { TriangleAlert, Check, Download, Upload } from 'lucide-svelte';
 
   let busy = $state(false);
   let message = $state<string | null>(null);
@@ -94,10 +95,10 @@
   </div>
 
   {#if message}
-    <div class="panel p-3 mb-4 hud" style="color: var(--accent-start)">✓ {message}</div>
+    <div class="panel p-3 mb-4 hud" style="color: var(--accent-start)"><Check size={14} /> {message}</div>
   {/if}
   {#if error}
-    <div class="panel p-3 mb-4 hud" style="color: var(--accent-finish)">⚠ {error}</div>
+    <div class="panel p-3 mb-4 hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
   {/if}
 
   <section class="panel p-5 mb-4">
@@ -106,8 +107,8 @@
       Classifica per percorso con tempi in formato leggibile (HH:MM:SS), categoria e flag duplicati.
     </p>
     <div class="flex flex-wrap gap-3">
-      <Button variant="primary" disabled={busy} onclick={exportXlsx}>⬇ XLSX (EXCEL)</Button>
-      <Button disabled={busy} onclick={exportCsv}>⬇ CSV</Button>
+      <Button variant="primary" disabled={busy} onclick={exportXlsx}><Download size={14} /> XLSX (EXCEL)</Button>
+      <Button disabled={busy} onclick={exportCsv}><Download size={14} /> CSV</Button>
     </div>
   </section>
 
@@ -118,15 +119,15 @@
       Il ripristino <strong>sostituisce</strong> tutti i dati attuali.
     </p>
     <div class="flex flex-wrap gap-3">
-      <Button variant="primary" disabled={busy} onclick={backup}>⬇ SALVA BACKUP</Button>
-      <Button disabled={busy} onclick={pickRestore}>⬆ RIPRISTINA…</Button>
+      <Button variant="primary" disabled={busy} onclick={backup}><Download size={14} /> SALVA BACKUP</Button>
+      <Button disabled={busy} onclick={pickRestore}><Upload size={14} /> RIPRISTINA…</Button>
     </div>
   </section>
 </div>
 
 {#if confirmRestore}
   <ConfirmModal
-    title="⚠ RIPRISTINA BACKUP"
+    title="RIPRISTINA BACKUP"
     message="Tutti i dati attuali verranno sostituiti con il contenuto del backup. Operazione irreversibile. Procedere?"
     confirmLabel="RIPRISTINA"
     onCancel={() => (confirmRestore = null)}

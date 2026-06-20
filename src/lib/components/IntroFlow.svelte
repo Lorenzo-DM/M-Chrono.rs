@@ -4,6 +4,7 @@
   import Button from '../ui/Button.svelte';
   import AthleteImportPanel from './AthleteImportPanel.svelte';
   import RaceSetupPanel from './RaceSetupPanel.svelte';
+  import { TriangleAlert, ArrowLeft, ArrowRight } from 'lucide-svelte';
 
   let { onReady }: { onReady: () => void } = $props();
 
@@ -138,7 +139,7 @@
       {/if}
 
       {#if error}
-        <div class="hud mt-6" style="color: var(--accent-finish)">⚠ {error}</div>
+        <div class="hud mt-6" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
       {/if}
     </div>
   </main>
@@ -148,7 +149,7 @@
           style="border-color: var(--line-2); background: var(--bg-1)">
     <div>
       {#if step > 0}
-        <Button variant="ghost" onclick={() => (step -= 1)}>← INDIETRO</Button>
+        <Button variant="ghost" onclick={() => (step -= 1)}><ArrowLeft size={14} /> INDIETRO</Button>
       {/if}
     </div>
 
@@ -165,9 +166,9 @@
       {/if}
       <Button variant="primary" class="px-6 py-3" disabled={saving} onclick={nextStep}>
         {#if step === 2}
-          AVVIA WORKSPACE →
+          AVVIA WORKSPACE <ArrowRight size={14} />
         {:else}
-          AVANTI →
+          AVANTI <ArrowRight size={14} />
         {/if}
       </Button>
     </div>

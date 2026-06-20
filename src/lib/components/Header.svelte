@@ -5,6 +5,13 @@
   import { cycleQuickToggle, resolvedTheme } from '../theme';
   import Button from '../ui/Button.svelte';
   import SegmentedControl from '../ui/SegmentedControl.svelte';
+  import {
+    Timer, ListOrdered, Settings, Download,
+    LayoutPanelTop, Columns2, LayoutGrid,
+    Menu, Sun, Moon, TriangleAlert,
+  } from 'lucide-svelte';
+
+  type LucideIcon = typeof Timer;
 
   let {
     current = 'timing',
@@ -16,17 +23,17 @@
     onDuplicates: () => void;
   }>();
 
-  const navItems: { id: NavView; label: string; icon: string; enabled: boolean }[] = [
-    { id: 'timing',   label: 'Timing',   icon: '◷', enabled: true },
-    { id: 'results',  label: 'Results',  icon: '▤', enabled: true },
-    { id: 'settings', label: 'Settings', icon: '⚙', enabled: true },
-    { id: 'export',   label: 'Export',   icon: '⇩', enabled: true },
+  const navItems: { id: NavView; label: string; icon: LucideIcon; enabled: boolean }[] = [
+    { id: 'timing',   label: 'Timing',   icon: Timer,       enabled: true },
+    { id: 'results',  label: 'Results',  icon: ListOrdered, enabled: true },
+    { id: 'settings', label: 'Settings', icon: Settings,    enabled: true },
+    { id: 'export',   label: 'Export',   icon: Download,    enabled: true },
   ];
 
-  const modes: { id: LayoutMode; label: string; icon: string }[] = [
-    { id: 'tabs',  label: 'Tabs',  icon: '▭'  },
-    { id: 'split', label: 'Split', icon: '▭▭' },
-    { id: 'grid',  label: 'Grid',  icon: '▦'  },
+  const modes: { id: LayoutMode; label: string; icon: LucideIcon }[] = [
+    { id: 'tabs',  label: 'Tabs',  icon: LayoutPanelTop },
+    { id: 'split', label: 'Split', icon: Columns2       },
+    { id: 'grid',  label: 'Grid',  icon: LayoutGrid     },
   ];
 
   function operatorColor(id?: string) {
@@ -110,13 +117,14 @@
           ariaExpanded={mobileDrawerOpen}
           title="Menu"
         >
-          ☰
+          <Menu size={18} />
         </Button>
       </div>
     {:else}
       <!-- Nav -->
       <nav class="flex items-center gap-1 ml-1 lg:ml-4">
         {#each navItems as n (n.id)}
+          {@const NavIcon = n.icon}
           <button
             class="nav-link"
             data-active={current === n.id}
@@ -125,7 +133,7 @@
             onclick={() => n.enabled && onNav(n.id)}
             title={n.enabled ? n.label : `${n.label} — prossimamente`}
           >
-            <span class="nav-ico" aria-hidden="true">{n.icon}</span>
+            <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
             {n.label}
           </button>
         {/each}
@@ -137,7 +145,7 @@
       <div class:invisible={current !== 'timing'} aria-hidden={current !== 'timing'}>
         <SegmentedControl
           ariaLabel="Layout"
-          options={modes.map((m) => ({ value: m.id, label: m.icon, title: m.label }))}
+          options={modes.map((m) => ({ value: m.id, label: m.label, icon: m.icon, title: m.label }))}
           value={$layoutMode}
           onChange={(v) => layoutMode.set(v as LayoutMode)}
         />
@@ -181,12 +189,12 @@
           title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
           ariaLabel="Cambia tema"
         >
-          {$resolvedTheme === 'dark' ? '☀' : '☾'}
+          {#if $resolvedTheme === 'dark'}<Sun size={16} />{:else}<Moon size={16} />{/if}
         </Button>
 
         {#if $config?.sync_enabled}
           <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
-            <span style="color: var(--accent-dup)">⚠</span> DUP
+            <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
           </Button>
         {/if}
       </div>
@@ -200,6 +208,7 @@
     >
       <nav class="flex flex-wrap gap-1">
         {#each navItems as n (n.id)}
+          {@const NavIcon = n.icon}
           <button
             class="nav-link"
             data-active={current === n.id}
@@ -208,7 +217,7 @@
             onclick={() => n.enabled && navClick(n.id)}
             title={n.enabled ? n.label : `${n.label} — prossimamente`}
           >
-            <span class="nav-ico" aria-hidden="true">{n.icon}</span>
+            <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
             {n.label}
           </button>
         {/each}
@@ -218,7 +227,7 @@
         <SegmentedControl
           fullWidth
           ariaLabel="Layout"
-          options={modes.map((m) => ({ value: m.id, label: m.icon, title: m.label }))}
+          options={modes.map((m) => ({ value: m.id, label: m.label, icon: m.icon, title: m.label }))}
           value={$layoutMode}
           onChange={(v) => layoutMode.set(v as LayoutMode)}
         />
@@ -239,12 +248,12 @@
           title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
           ariaLabel="Cambia tema"
         >
-          {$resolvedTheme === 'dark' ? '☀ Chiaro' : '☾ Scuro'}
+          {#if $resolvedTheme === 'dark'}<Sun size={16} /> Chiaro{:else}<Moon size={16} /> Scuro{/if}
         </Button>
 
         {#if $config?.sync_enabled}
           <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
-            <span style="color: var(--accent-dup)">⚠</span> DUP
+            <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
           </Button>
         {/if}
       </div>
