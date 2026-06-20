@@ -74,7 +74,7 @@ bun run test --run
 ## Logs
 
 Daily-rotated log files are written to `<app_data_dir>/logs/race.log.<date>`.
-Filter via `RUST_LOG`, e.g. `RUST_LOG=trailtrace_stopwatch_lib=debug`.
+Filter via `RUST_LOG`, e.g. `RUST_LOG=m_chrono_lib=debug`.
 
 ## Smoke tests
 
