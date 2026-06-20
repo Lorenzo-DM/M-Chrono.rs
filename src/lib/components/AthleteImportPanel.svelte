@@ -6,6 +6,7 @@
   import { TriangleAlert, Check } from 'lucide-svelte';
   import AthleteFormModal from './AthleteFormModal.svelte';
   import { open as openDialog } from '@tauri-apps/plugin-dialog';
+  import { t, i } from '../i18n';
 
   let { onImported }: { onImported?: () => void } = $props();
 
@@ -50,7 +51,7 @@
       fetchStatus = `OK · ${s.courses_count} percorsi · ${s.athletes_count} atleti`;
       await refreshCourses();
     } catch (e: any) {
-      fetchStatus = `ERRORE · ${e?.message ?? JSON.stringify(e)}`;
+      fetchStatus = `${$t.common.error} · ${e?.message ?? JSON.stringify(e)}`;
     } finally { fetching = false; }
   }
 </script>
@@ -58,23 +59,23 @@
 <div class="flex flex-col gap-4">
   <div class="flex flex-wrap items-center gap-3">
     <Button variant="primary" disabled={importing} onclick={importFile}>
-      {importing ? 'IMPORTAZIONE…' : 'IMPORTA FILE (XLSX/CSV)'}
+      {importing ? $t.athletes.importing : $t.athletes.importButton}
     </Button>
-    <Button onclick={() => (showForm = true)}>AGGIUNGI MANUALMENTE</Button>
+    <Button onclick={() => (showForm = true)}>{$t.athletes.addManualButton}</Button>
     {#if $config?.sync_enabled}
       <Button disabled={fetching} onclick={fetchFromServer}>
-        SCARICA DAL SERVER
+        {$t.athletes.fetchFromServer}
       </Button>
     {/if}
   </div>
 
   <div class="hud" style="color: var(--fg-3)">
-    Colonne: pettorale, nome, cognome, percorso, categoria (opz.) — intestazione opzionale
+    {$t.athletes.columnHint}
   </div>
 
   {#if $config?.sync_enabled && !$isAuthenticated}
     <div class="hud" style="color: var(--fg-3)">
-      Per scaricare dal server serve il login (impostazioni → autenticazione)
+      {$t.athletes.syncLoginHint}
     </div>
   {/if}
 
@@ -90,19 +91,19 @@
     <div class="panel p-4">
       <div class="flex flex-wrap items-center gap-4">
         <span class="hud-strong" style="color: var(--accent-start)">
-          <Check size={14} /> {summary.inserted} inseriti
+          <Check size={14} /> {i($t.athletes.insertedCount, { n: summary.inserted })}
         </span>
         <span class="hud-strong" style="color: var(--fg-1)">
-          {summary.updated} aggiornati
+          {i($t.athletes.updatedCount, { n: summary.updated })}
         </span>
         {#if summary.courses_created > 0}
           <span class="hud-strong" style="color: var(--fg-1)">
-            {summary.courses_created} percorsi creati
+            {i($t.athletes.coursesCreated, { n: summary.courses_created })}
           </span>
         {/if}
         {#if summary.errors.length > 0}
           <span class="hud-strong" style="color: var(--accent-pending)">
-            <TriangleAlert size={14} /> {summary.errors.length} righe scartate
+            <TriangleAlert size={14} /> {i($t.athletes.rowsDiscarded, { n: summary.errors.length })}
           </span>
         {/if}
       </div>
@@ -110,7 +111,7 @@
         <ul class="mt-3 max-h-40 overflow-auto flex flex-col gap-1">
           {#each summary.errors as err (err.row + err.message)}
             <li class="hud" style="color: var(--accent-pending)">
-              riga {err.row} — {err.message}
+              {i($t.athletes.rowError, { row: err.row, message: err.message })}
             </li>
           {/each}
         </ul>

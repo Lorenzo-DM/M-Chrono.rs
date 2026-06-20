@@ -2,6 +2,7 @@
   import type { Course } from '../types';
   import Button from '../ui/Button.svelte';
   import { TriangleAlert } from 'lucide-svelte';
+  import { t } from '../i18n';
 
   type Variant = 'end' | 'restart';
 
@@ -23,29 +24,23 @@
 
   let matches = $derived(typed.trim() === course.name);
 
-  const COPY = {
-    end: {
-      title: 'TERMINA GARA',
-      titleColor: 'var(--accent-finish)',
-      lead: 'Stai per <strong>terminare definitivamente</strong> il percorso:',
-      body:
-        'Dopo la conferma il timer si ferma e non sarà più possibile registrare nuovi arrivi su questo percorso. Operazione irreversibile.',
-      cta: 'TERMINA GARA',
-      busy: 'TERMINANDO…',
-      ctaBg: 'var(--accent-finish)',
-    },
-    restart: {
-      title: '↻ RIAVVIA GARA',
-      titleColor: 'var(--accent-pending)',
-      lead: 'Stai per <strong>azzerare il cronometro</strong> del percorso:',
-      body:
-        'Tutti i tempi registrati per questo percorso (arrivi e pending) verranno eliminati. Il timer torna a 00:00:00 e potrai dare un nuovo START. Operazione irreversibile.',
-      cta: 'RIAVVIA GARA',
-      busy: 'RIAVVIANDO…',
-      ctaBg: 'var(--accent-pending)',
-    },
-  } as const;
-  let copy = $derived(COPY[variant]);
+  let copy = $derived(variant === 'end' ? {
+    title: $t.modals.confirmRace.endTitle,
+    titleColor: 'var(--accent-finish)',
+    lead: $t.modals.confirmRace.endLead,
+    body: $t.modals.confirmRace.endBody,
+    cta: $t.modals.confirmRace.endCta,
+    busy: $t.modals.confirmRace.endBusy,
+    ctaBg: 'var(--accent-finish)',
+  } : {
+    title: $t.modals.confirmRace.restartTitle,
+    titleColor: 'var(--accent-pending)',
+    lead: $t.modals.confirmRace.restartLead,
+    body: $t.modals.confirmRace.restartBody,
+    cta: $t.modals.confirmRace.restartCta,
+    busy: $t.modals.confirmRace.restartBusy,
+    ctaBg: 'var(--accent-pending)',
+  });
 
   async function confirm() {
     if (!matches || busy) return;
@@ -89,7 +84,7 @@
         class="my-3 px-3 py-2 rounded-md"
         style="background: var(--bg-2); border: 1px solid var(--line-2)"
       >
-        <div class="hud" style="color: var(--fg-2)">PERCORSO</div>
+        <div class="hud" style="color: var(--fg-2)">{$t.modals.confirmRace.courseLabel}</div>
         <div
           class="text-xl font-semibold mt-0.5"
           style="color: var(--fg-0); letter-spacing: -0.01em"
@@ -101,7 +96,7 @@
         {copy.body}
       </p>
 
-      <div class="hud mb-2">DIGITA IL NOME DEL PERCORSO PER CONFERMARE</div>
+      <div class="hud mb-2">{$t.modals.confirmRace.typeToConfirm}</div>
       <!-- svelte-ignore a11y_autofocus -->
       <input
         bind:value={typed}
@@ -118,7 +113,7 @@
       {/if}
 
       <div class="flex gap-2 mt-6">
-        <Button class="flex-1 py-3" onclick={onClose}>ANNULLA</Button>
+        <Button class="flex-1 py-3" onclick={onClose}>{$t.common.cancel}</Button>
         <Button
           class="flex-1 py-3"
           style={matches

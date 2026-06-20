@@ -4,6 +4,7 @@
   import type { Race } from '../types';
   import Button from '../ui/Button.svelte';
   import { TriangleAlert, X } from 'lucide-svelte';
+  import { t } from '../i18n';
 
   let { onChange }: { onChange?: () => void } = $props();
 
@@ -11,7 +12,7 @@
   let selectedRaceId = $state<number | null>(null);
   let mode = $state<'select' | 'new'>('new');
   let newRaceName = $state('');
-  let newRaceDate = $state(''); // yyyy-mm-dd
+  let newRaceDate = $state('');
   let newCourseName = $state('');
   let newCourseKm = $state('');
   let error = $state<string | null>(null);
@@ -41,7 +42,7 @@
 
   async function createRace() {
     error = null;
-    if (!newRaceName.trim()) { error = 'nome gara obbligatorio'; return; }
+    if (!newRaceName.trim()) { error = $t.race.errorRaceNameRequired; return; }
     busy = true;
     try {
       const ms = newRaceDate ? new Date(newRaceDate).getTime() : null;
@@ -60,7 +61,7 @@
   async function addCourse() {
     error = null;
     if (selectedRaceId == null) return;
-    if (!newCourseName.trim()) { error = 'nome percorso obbligatorio'; return; }
+    if (!newCourseName.trim()) { error = $t.race.errorCourseNameRequired; return; }
     busy = true;
     try {
       const km = parseFloat(newCourseKm.replace(',', '.'));
@@ -100,7 +101,7 @@
 
   async function removeRace(id: number) {
     error = null;
-    if (!confirm('Eliminare la gara? I percorsi restano ma senza gara.')) return;
+    if (!confirm($t.race.deleteRaceConfirm)) return;
     try {
       await api.deleteRace(id);
       selectedRaceId = null;
@@ -117,66 +118,66 @@
   {#if races.length > 0}
     <div class="flex flex-wrap items-end gap-3">
       <label class="flex flex-col gap-1">
-        <span class="hud">GARA</span>
+        <span class="hud">{$t.race.raceLabel}</span>
         <select bind:value={selectedRaceId} onchange={() => (mode = 'select')}>
           {#each races as r (r.id)}
             <option value={r.id}>{r.name}{r.scheduled_at_ms ? ` · ${fmtDate(r.scheduled_at_ms)}` : ''}</option>
           {/each}
         </select>
       </label>
-      <Button onclick={() => { mode = 'new'; selectedRaceId = null; }}>+ NUOVA GARA</Button>
+      <Button onclick={() => { mode = 'new'; selectedRaceId = null; }}>{$t.race.newRaceButton}</Button>
       {#if mode === 'select' && selectedRaceId != null}
-        <Button variant="ghost" onclick={() => removeRace(selectedRaceId!)} title="Elimina gara">ELIMINA GARA</Button>
+        <Button variant="ghost" onclick={() => removeRace(selectedRaceId!)} title={$t.race.deleteRaceButton}>
+          {$t.race.deleteRaceButton}
+        </Button>
       {/if}
     </div>
   {/if}
 
   {#if mode === 'new'}
     <div class="panel p-4 flex flex-col gap-3">
-      <div class="hud">NUOVA GARA</div>
+      <div class="hud">{$t.race.newRaceSectionTitle}</div>
       <div class="grid grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
-          <span class="hud">NOME GARA</span>
-          <input bind:value={newRaceName} placeholder="es. Trail del Monte" autocomplete="off" />
+          <span class="hud">{$t.race.raceNameLabel}</span>
+          <input bind:value={newRaceName} placeholder={$t.race.raceNamePlaceholder} autocomplete="off" />
         </label>
         <label class="flex flex-col gap-1">
-          <span class="hud">DATA (opzionale)</span>
+          <span class="hud">{$t.race.scheduledAtLabel}</span>
           <input type="date" bind:value={newRaceDate} />
         </label>
       </div>
       <div>
-        <Button variant="primary" disabled={busy} onclick={createRace}>CREA GARA</Button>
+        <Button variant="primary" disabled={busy} onclick={createRace}>{$t.race.createRaceButton}</Button>
       </div>
     </div>
   {/if}
 
   {#if mode === 'select' && selectedRaceId != null}
     <div class="panel p-4 flex flex-col gap-3">
-      <div class="hud">PERCORSI</div>
+      <div class="hud">{$t.race.coursesSectionTitle}</div>
       <div class="flex items-end gap-2">
         <label class="flex flex-col gap-1 flex-1 max-w-sm">
-          <span class="hud">NOME PERCORSO</span>
+          <span class="hud">{$t.race.courseNameLabel}</span>
           <input
             bind:value={newCourseName}
-            placeholder="es. 21K"
+            placeholder={$t.race.courseNamePlaceholder}
             autocomplete="off"
             onkeydown={(e) => e.key === 'Enter' && addCourse()}
           />
         </label>
         <label class="flex flex-col gap-1 w-28">
-          <span class="hud">KM (opz.)</span>
+          <span class="hud">{$t.race.distanceLabel}</span>
           <input
             bind:value={newCourseKm}
-            type="number"
+            type="text"
             inputmode="decimal"
-            min="0"
-            step="0.1"
             placeholder="21"
             class="num"
             onkeydown={(e) => e.key === 'Enter' && addCourse()}
           />
         </label>
-        <Button variant="primary" disabled={busy} onclick={addCourse}>+ AGGIUNGI</Button>
+        <Button variant="primary" disabled={busy} onclick={addCourse}>{$t.race.addCourseButton}</Button>
       </div>
 
       {#if raceCourses.length > 0}
@@ -198,13 +199,15 @@
                 />
                 <span class="hud" style="color: var(--fg-3)">KM</span>
               </label>
-              <Button variant="ghost" size="sm" onclick={() => removeCourse(c.id)} title="Rimuovi"><X size={14} /></Button>
+              <Button variant="ghost" size="sm" onclick={() => removeCourse(c.id)} title={$t.common.remove}>
+                <X size={14} />
+              </Button>
             </li>
           {/each}
         </ul>
       {:else}
         <div class="hud" style="color: var(--fg-3)">
-          Nessun percorso. Aggiungine almeno uno (es. 21K, 10K).
+          {$t.race.noCoursesHint}
         </div>
       {/if}
     </div>

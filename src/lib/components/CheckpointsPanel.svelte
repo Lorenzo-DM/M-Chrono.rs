@@ -5,6 +5,7 @@
   import type { Checkpoint } from '../types';
   import Button from '../ui/Button.svelte';
   import { TriangleAlert, X } from 'lucide-svelte';
+  import { t } from '../i18n';
 
   let checkpoints = $state<Checkpoint[]>([]);
   let selectedCourseId = $state<number | null>(null);
@@ -34,8 +35,8 @@
 
   async function add() {
     error = null;
-    if (selectedCourseId == null) { error = 'seleziona un percorso'; return; }
-    if (!newName.trim()) { error = 'nome checkpoint obbligatorio'; return; }
+    if (selectedCourseId == null) { error = $t.checkpoints.errorCourseRequired; return; }
+    if (!newName.trim()) { error = $t.checkpoints.errorNameRequired; return; }
     busy = true;
     try {
       const position = courseCheckpoints.length + 1;
@@ -64,13 +65,12 @@
 
 <div class="flex flex-col gap-3">
   <p class="text-sm" style="color: var(--fg-2)">
-    Punti di passaggio intermedi. Durante la gara registra i transiti per pettorale
-    dalla scheda del percorso; i tempi parziali finiscono nell'export.
+    {$t.checkpoints.description}
   </p>
 
   <div class="flex items-end gap-2">
     <label class="flex flex-col gap-1">
-      <span class="hud">PERCORSO</span>
+      <span class="hud">{$t.checkpoints.courseLabel}</span>
       <select bind:value={selectedCourseId}>
         {#each $courses as c (c.id)}
           <option value={c.id}>{c.name}</option>
@@ -78,15 +78,15 @@
       </select>
     </label>
     <label class="flex flex-col gap-1 flex-1 max-w-xs">
-      <span class="hud">NUOVO CHECKPOINT</span>
+      <span class="hud">{$t.checkpoints.newCheckpointLabel}</span>
       <input
         bind:value={newName}
-        placeholder="es. KM 10, Rifugio"
+        placeholder={$t.checkpoints.newCheckpointPlaceholder}
         autocomplete="off"
         onkeydown={(e) => e.key === 'Enter' && add()}
       />
     </label>
-    <Button variant="primary" disabled={busy} onclick={add}>+ AGGIUNGI</Button>
+    <Button variant="primary" disabled={busy} onclick={add}>{$t.checkpoints.addButton}</Button>
   </div>
 
   {#if courseCheckpoints.length > 0}
@@ -97,12 +97,14 @@
           <span style="color: var(--fg-0)">
             <span class="num" style="color: var(--fg-3)">{cp.position}.</span> {cp.name}
           </span>
-          <Button variant="ghost" size="sm" onclick={() => remove(cp.id)} title="Rimuovi"><X size={14} /></Button>
+          <Button variant="ghost" size="sm" onclick={() => remove(cp.id)} title={$t.checkpoints.removeTitle}>
+            <X size={14} />
+          </Button>
         </li>
       {/each}
     </ul>
   {:else}
-    <div class="hud" style="color: var(--fg-3)">Nessun checkpoint per questo percorso.</div>
+    <div class="hud" style="color: var(--fg-3)">{$t.checkpoints.noCheckpoints}</div>
   {/if}
 
   {#if error}

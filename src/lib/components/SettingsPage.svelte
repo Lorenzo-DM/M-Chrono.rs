@@ -13,6 +13,8 @@
     import CheckpointsPanel from "./CheckpointsPanel.svelte";
     import { isMuted, setMuted } from "../sound";
     import type { AppConfig, Athlete } from "../types";
+    import { locale, SUPPORTED_LOCALES, t, i } from "../i18n";
+    import type { Locale } from "../i18n";
 
     let { onBack: _onBack }: { onBack?: () => void } = $props();
 
@@ -29,14 +31,14 @@
         sync_enabled: $config?.sync_enabled ?? false,
     });
 
-    type SettingsTab = "generale" | "gara" | "atleti" | "sync";
-    const tabs: { id: SettingsTab; label: string }[] = [
-        { id: "generale", label: "Generale" },
-        { id: "gara", label: "Gara" },
-        { id: "atleti", label: "Atleti" },
-        { id: "sync", label: "Sync" },
-    ];
-    let tab = $state<SettingsTab>("generale");
+    type SettingsTab = "general" | "race" | "athletes" | "sync";
+    let tabs = $derived([
+        { id: "general" as SettingsTab, label: $t.settings.tabs.general },
+        { id: "race"    as SettingsTab, label: $t.settings.tabs.race },
+        { id: "athletes"as SettingsTab, label: $t.settings.tabs.athletes },
+        { id: "sync"    as SettingsTab, label: $t.settings.tabs.sync },
+    ]);
+    let tab = $state<SettingsTab>("general");
 
     let saving = $state(false);
     let saved = $state(false);
@@ -123,7 +125,11 @@
 
     async function removeAthlete(a: Athlete) {
         athleteError = null;
-        if (!confirm(`Eliminare ${a.first_name} ${a.last_name} (pett. ${a.bib_number})?`)) return;
+        if (!confirm(i($t.settings.athletes.confirmDelete, {
+            firstName: a.first_name,
+            lastName: a.last_name,
+            bib: a.bib_number,
+        }))) return;
         try {
             await api.deleteAthlete(a.id);
             await loadAthletes();
@@ -141,24 +147,24 @@
 <div class="p-6 max-w-5xl mx-auto">
     <div class="flex items-center justify-between mb-5">
         <div>
-            <div class="hud" style="color: var(--fg-3)">CONFIGURAZIONE</div>
+            <div class="hud" style="color: var(--fg-3)">{$t.settings.subtitle}</div>
             <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">
-                SETTINGS
+                {$t.settings.title}
             </h2>
         </div>
     </div>
 
     <!-- Sub-tabs -->
-    <div class="settings-tabs" role="tablist" aria-label="Sezioni impostazioni">
-        {#each tabs as t (t.id)}
+    <div class="settings-tabs" role="tablist" aria-label={$t.settings.subtitle}>
+        {#each tabs as t_ (t_.id)}
             <button
                 class="settings-tab"
                 role="tab"
-                aria-selected={tab === t.id}
-                data-active={tab === t.id}
-                onclick={() => (tab = t.id)}
+                aria-selected={tab === t_.id}
+                data-active={tab === t_.id}
+                onclick={() => (tab = t_.id)}
             >
-                {t.label}
+                {t_.label}
             </button>
         {/each}
     </div>
@@ -171,69 +177,68 @@
                 onclick={save}
                 class="px-6 py-3"
             >
-                {saving ? "SALVATAGGIO…" : "SALVA CONFIGURAZIONE"}
+                {saving ? $t.common.saving : $t.settings.saveConfig}
             </Button>
             {#if saved}
-                <span class="hud" style="color: var(--accent-start)"><Check size={14} /> SALVATO</span>
+                <span class="hud" style="color: var(--accent-start)"><Check size={14} /> {$t.common.saved}</span>
             {/if}
         </div>
     {/snippet}
 
     <!-- ============ GENERALE ============ -->
-    {#if tab === "generale"}
+    {#if tab === "general"}
     <div class="grid grid-cols-12 gap-4">
-        <!-- General -->
         <section class="panel p-4 col-span-6">
-            <div class="hud mb-4">GENERALE</div>
+            <div class="hud mb-4">{$t.settings.general.sectionTitle}</div>
             <div class="flex flex-col gap-3">
                 <label class="flex flex-col gap-1">
-                    <span class="hud">NOME OPERATORE</span>
+                    <span class="hud">{$t.settings.general.operatorName}</span>
                     <input bind:value={form.operator_id} placeholder="PC-A" />
                 </label>
                 <div class="grid grid-cols-2 gap-3">
                     <label class="flex flex-col gap-1">
-                        <span class="hud">DEDUP WINDOW (ms)</span>
-                        <input
-                            type="number"
-                            bind:value={form.dedup_window_ms}
-                            min="0"
-                        />
+                        <span class="hud">{$t.settings.general.dedupWindow}</span>
+                        <input type="number" bind:value={form.dedup_window_ms} min="0" />
                     </label>
                     <label class="flex flex-col gap-1">
-                        <span class="hud">DEDUP WARN Δ (ms)</span>
-                        <input
-                            type="number"
-                            bind:value={form.dedup_warn_delta_ms}
-                            min="0"
-                        />
+                        <span class="hud">{$t.settings.general.dedupWarnDelta}</span>
+                        <input type="number" bind:value={form.dedup_warn_delta_ms} min="0" />
                     </label>
                 </div>
             </div>
         </section>
 
-        <!-- Aspetto -->
         <section class="panel p-4 col-span-6">
-            <div class="hud mb-3">ASPETTO</div>
+            <div class="hud mb-3">{$t.settings.appearance.sectionTitle}</div>
             <SegmentedControl
-                ariaLabel="Tema"
+                ariaLabel={$t.settings.appearance.theme}
                 options={[
-                    { value: 'auto', label: 'Auto', title: 'Tema automatico' },
-                    { value: 'light', label: 'Chiaro', title: 'Tema chiaro' },
-                    { value: 'dark', label: 'Scuro', title: 'Tema scuro' },
+                    { value: 'auto',  label: $t.settings.appearance.themeAuto,  title: $t.settings.appearance.themeAutoTitle },
+                    { value: 'light', label: $t.settings.appearance.themeLight, title: $t.settings.appearance.themeLightTitle },
+                    { value: 'dark',  label: $t.settings.appearance.themeDark,  title: $t.settings.appearance.themeDarkTitle },
                 ]}
                 value={$themeMode}
                 onChange={(v) => themeMode.set(v as ThemeMode)}
             />
-            <div class="hud mt-4 mb-2">SUONO</div>
+            <div class="hud mt-4 mb-2">{$t.settings.appearance.sound}</div>
             <SegmentedControl
-                ariaLabel="Suono"
+                ariaLabel={$t.settings.appearance.sound}
                 options={[
-                    { value: 'on', label: 'On', title: 'Feedback sonoro attivo' },
-                    { value: 'off', label: 'Off', title: 'Silenzioso' },
+                    { value: 'on',  label: $t.common.on,  title: $t.settings.appearance.soundOnTitle },
+                    { value: 'off', label: $t.common.off, title: $t.settings.appearance.soundOffTitle },
                 ]}
                 value={soundOn ? 'on' : 'off'}
                 onChange={(v) => toggleSound(v === 'on')}
             />
+            <div class="hud mt-4 mb-2">{$t.settings.appearance.language}</div>
+            <select
+                value={$locale}
+                onchange={(e) => locale.set((e.target as HTMLSelectElement).value as Locale)}
+            >
+                {#each SUPPORTED_LOCALES as l (l.code)}
+                    <option value={l.code}>{l.nativeName}</option>
+                {/each}
+            </select>
         </section>
 
         <div class="col-span-12">{@render saveFooter()}</div>
@@ -241,28 +246,25 @@
     {/if}
 
     <!-- ============ GARA ============ -->
-    {#if tab === "gara"}
+    {#if tab === "race"}
     <div class="grid grid-cols-12 gap-4">
-        <!-- Race + courses -->
         <section class="panel p-4 col-span-12">
-            <div class="hud mb-4">GARA / PERCORSI</div>
+            <div class="hud mb-4">{$t.settings.race.sectionTitle}</div>
             <RaceSetupPanel />
         </section>
 
-        <!-- Checkpoints -->
         <section class="panel p-4 col-span-12">
-            <div class="hud mb-4">CHECKPOINT / TEMPI PARZIALI</div>
+            <div class="hud mb-4">{$t.settings.race.checkpointsSectionTitle}</div>
             <CheckpointsPanel />
         </section>
     </div>
     {/if}
 
     <!-- ============ ATLETI ============ -->
-    {#if tab === "atleti"}
+    {#if tab === "athletes"}
     <div class="grid grid-cols-12 gap-4">
-        <!-- Athletes -->
         <section class="panel p-4 col-span-12">
-            <div class="hud mb-4">ATLETI</div>
+            <div class="hud mb-4">{$t.settings.athletes.sectionTitle}</div>
             <AthleteImportPanel onImported={loadAthletes} />
 
             {#if athleteError}
@@ -275,11 +277,11 @@
                 <div class="mt-5 flex items-center gap-3">
                     <input
                         bind:value={athleteFilter}
-                        placeholder="Cerca per pettorale, nome, percorso…"
+                        placeholder={$t.settings.athletes.searchPlaceholder}
                         class="flex-1 max-w-md"
                     />
                     <span class="hud" style="color: var(--fg-3)">
-                        {filteredAthletes.length} / {athletes.length}
+                        {i($t.settings.athletes.countLabel, { filtered: filteredAthletes.length, total: athletes.length })}
                     </span>
                 </div>
                 <div class="mt-3 max-h-80 overflow-auto border rounded"
@@ -287,11 +289,11 @@
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="hud text-left" style="background: var(--bg-2)">
-                                <th class="px-3 py-2">PETT.</th>
-                                <th class="px-3 py-2">NOME</th>
-                                <th class="px-3 py-2">COGNOME</th>
-                                <th class="px-3 py-2">CAT.</th>
-                                <th class="px-3 py-2">PERCORSO</th>
+                                <th class="px-3 py-2">{$t.settings.athletes.columns.bib}</th>
+                                <th class="px-3 py-2">{$t.settings.athletes.columns.firstName}</th>
+                                <th class="px-3 py-2">{$t.settings.athletes.columns.lastName}</th>
+                                <th class="px-3 py-2">{$t.settings.athletes.columns.category}</th>
+                                <th class="px-3 py-2">{$t.settings.athletes.columns.course}</th>
                                 <th class="px-3 py-2"></th>
                                 <th class="px-3 py-2"></th>
                             </tr>
@@ -302,7 +304,7 @@
                                     <td class="px-3 py-1.5 num" style="color: var(--fg-0)">{a.bib_number}</td>
                                     <td class="px-3 py-1.5" style="color: var(--fg-1)">
                                         {#if a.anonymous}
-                                            <span class="hud" style="color: var(--accent-pending)">SENZA NOME</span>
+                                            <span class="hud" style="color: var(--accent-pending)">{$t.settings.athletes.anonymous}</span>
                                         {:else}{a.first_name}{/if}
                                     </td>
                                     <td class="px-3 py-1.5" style="color: var(--fg-1)">{a.last_name}</td>
@@ -312,12 +314,12 @@
                                     </td>
                                     <td class="px-3 py-1.5">
                                         {#if a.id < 0}
-                                            <span class="hud" style="color: var(--fg-3)">LOCALE</span>
+                                            <span class="hud" style="color: var(--fg-3)">{$t.settings.athletes.localLabel}</span>
                                         {/if}
                                     </td>
                                     <td class="px-3 py-1.5 text-right whitespace-nowrap">
-                                        <Button variant="ghost" size="sm" onclick={() => editAthlete(a)} title="Modifica">✎</Button>
-                                        <Button variant="ghost" size="sm" onclick={() => removeAthlete(a)} title="Elimina"><X size={14} /></Button>
+                                        <Button variant="ghost" size="sm" onclick={() => editAthlete(a)} title={$t.common.edit}>✎</Button>
+                                        <Button variant="ghost" size="sm" onclick={() => removeAthlete(a)} title={$t.common.delete}><X size={14} /></Button>
                                     </td>
                                 </tr>
                             {/each}
@@ -326,7 +328,7 @@
                 </div>
             {:else}
                 <div class="hud mt-4" style="color: var(--fg-3)">
-                    Nessun atleta. Importa un file o aggiungili manualmente.
+                    {$t.settings.athletes.noAthletes}
                 </div>
             {/if}
         </section>
@@ -336,15 +338,14 @@
     <!-- ============ SYNC ============ -->
     {#if tab === "sync"}
     <div class="grid grid-cols-12 gap-4">
-        <!-- Sync -->
         <section class="panel p-4 col-span-12">
             <div class="flex items-center justify-between mb-4">
-                <div class="hud">SINCRONIZZAZIONE BACKEND</div>
+                <div class="hud">{$t.settings.sync.sectionTitle}</div>
                 <SegmentedControl
-                    ariaLabel="Sincronizzazione"
+                    ariaLabel={$t.settings.sync.sectionTitle}
                     options={[
-                        { value: 'off', label: 'OFF', title: 'Solo locale' },
-                        { value: 'on', label: 'ON', title: 'Sync con backend' },
+                        { value: 'off', label: $t.settings.sync.toggleOffLabel, title: $t.settings.sync.toggleOffTitle },
+                        { value: 'on',  label: $t.settings.sync.toggleOnLabel,  title: $t.settings.sync.toggleOnTitle },
                     ]}
                     value={form.sync_enabled ? 'on' : 'off'}
                     onChange={(v) => toggleSync(v === 'on')}
@@ -353,20 +354,15 @@
 
             {#if !form.sync_enabled}
                 <div class="hud" style="color: var(--fg-3)">
-                    L'app lavora solo in locale. Attiva per sincronizzare tempi
-                    e atleti con il backend.
+                    {$t.settings.sync.offlineDescription}
                 </div>
             {:else}
                 <div class="grid grid-cols-12 gap-4">
-                    <!-- OIDC -->
                     <div class="col-span-6 flex flex-col gap-3">
-                        <div class="hud">OIDC (ZITADEL)</div>
+                        <div class="hud">{$t.settings.sync.oidcSection}</div>
                         <label class="flex flex-col gap-1">
                             <span class="hud">ISSUER_URL</span>
-                            <input
-                                bind:value={form.oidc_issuer_url}
-                                placeholder="https://example.zitadel.cloud"
-                            />
+                            <input bind:value={form.oidc_issuer_url} placeholder="https://example.zitadel.cloud" />
                         </label>
                         <label class="flex flex-col gap-1">
                             <span class="hud">CLIENT_ID</span>
@@ -378,47 +374,31 @@
                         </label>
                     </div>
 
-                    <!-- API -->
                     <div class="col-span-6 flex flex-col gap-3">
-                        <div class="hud">API</div>
+                        <div class="hud">{$t.settings.sync.apiSection}</div>
                         <label class="flex flex-col gap-1">
                             <span class="hud">BASE_URL</span>
-                            <input
-                                bind:value={form.api_base_url}
-                                placeholder="https://api.example.com"
-                            />
+                            <input bind:value={form.api_base_url} placeholder="https://api.example.com" />
                         </label>
                         <label class="flex flex-col gap-1">
-                            <span class="hud">SYNC_INTERVAL (sec)</span>
-                            <input
-                                type="number"
-                                bind:value={form.sync_interval_secs}
-                                min="1"
-                            />
+                            <span class="hud">{$t.settings.sync.syncIntervalLabel}</span>
+                            <input type="number" bind:value={form.sync_interval_secs} min="1" />
                         </label>
                     </div>
 
-                    <!-- Auth -->
                     <div class="col-span-12 border-t pt-4" style="border-color: var(--line-1)">
-                        <div class="hud mb-3">AUTENTICAZIONE</div>
+                        <div class="hud mb-3">{$t.settings.sync.authSection}</div>
                         {#if authed}
                             <div class="flex items-center gap-3">
                                 <span class="dot-running"></span>
-                                <span class="hud-strong" style="color: var(--accent-start)"
-                                    >LOGIN ATTIVO</span
-                                >
-                                <Button onclick={doLogout}>LOGOUT</Button>
+                                <span class="hud-strong" style="color: var(--accent-start)">{$t.settings.sync.loginActive}</span>
+                                <Button onclick={doLogout}>{$t.settings.sync.logout}</Button>
                             </div>
                         {:else}
                             <div class="flex items-center gap-3">
-                                <span
-                                    class="dot-idle"
-                                    style="background: var(--accent-finish)"
-                                ></span>
-                                <span class="hud-strong" style="color: var(--accent-finish)"
-                                    >NON AUTENTICATO</span
-                                >
-                                <Button variant="primary" onclick={() => (showLogin = true)}>ACCEDI</Button>
+                                <span class="dot-idle" style="background: var(--accent-finish)"></span>
+                                <span class="hud-strong" style="color: var(--accent-finish)">{$t.settings.sync.notAuthenticated}</span>
+                                <Button variant="primary" onclick={() => (showLogin = true)}>{$t.settings.sync.login}</Button>
                             </div>
                         {/if}
                     </div>

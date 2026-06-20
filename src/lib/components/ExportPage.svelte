@@ -4,6 +4,7 @@
   import Button from '../ui/Button.svelte';
   import ConfirmModal from './ConfirmModal.svelte';
   import { TriangleAlert, Check, Download, Upload } from 'lucide-svelte';
+  import { t, i } from '../i18n';
 
   let busy = $state(false);
   let message = $state<string | null>(null);
@@ -29,7 +30,7 @@
     busy = true;
     try {
       const s = await api.exportResultsXlsx(path);
-      message = `XLSX: ${s.athletes_count} atleti su ${s.courses_count} percorsi`;
+      message = i($t.export.xlsxSuccess, { athletes: s.athletes_count, courses: s.courses_count });
     } catch (e: any) {
       error = e?.message ?? String(e);
     } finally { busy = false; }
@@ -45,7 +46,7 @@
     busy = true;
     try {
       const s = await api.exportResultsCsv(path);
-      message = `CSV: ${s.athletes_count} atleti su ${s.courses_count} percorsi`;
+      message = i($t.export.csvSuccess, { athletes: s.athletes_count, courses: s.courses_count });
     } catch (e: any) {
       error = e?.message ?? String(e);
     } finally { busy = false; }
@@ -61,7 +62,7 @@
     busy = true;
     try {
       await api.backupDatabase(path);
-      message = `Backup salvato: ${path}`;
+      message = i($t.export.backupSuccess, { path });
     } catch (e: any) {
       error = e?.message ?? String(e);
     } finally { busy = false; }
@@ -81,7 +82,7 @@
     busy = true;
     try {
       await api.restoreDatabase(path);
-      message = 'Database ripristinato dal backup.';
+      message = $t.export.restoreSuccess;
     } catch (e: any) {
       error = e?.message ?? String(e);
     } finally { busy = false; }
@@ -90,8 +91,8 @@
 
 <div class="p-6 max-w-3xl mx-auto">
   <div class="mb-6">
-    <div class="hud" style="color: var(--fg-3)">DATI</div>
-    <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">EXPORT &amp; BACKUP</h2>
+    <div class="hud" style="color: var(--fg-3)">{$t.export.sectionTitle}</div>
+    <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">{$t.export.pageTitle}</h2>
   </div>
 
   {#if message}
@@ -102,34 +103,41 @@
   {/if}
 
   <section class="panel p-5 mb-4">
-    <div class="hud mb-1">ESPORTA RISULTATI</div>
+    <div class="hud mb-1">{$t.export.exportSectionTitle}</div>
     <p class="text-sm mb-4" style="color: var(--fg-2)">
-      Classifica per percorso con tempi in formato leggibile (HH:MM:SS), categoria e flag duplicati.
+      {$t.export.exportDescription}
     </p>
     <div class="flex flex-wrap gap-3">
-      <Button variant="primary" disabled={busy} onclick={exportXlsx}><Download size={14} /> XLSX (EXCEL)</Button>
-      <Button disabled={busy} onclick={exportCsv}><Download size={14} /> CSV</Button>
+      <Button variant="primary" disabled={busy} onclick={exportXlsx}>
+        <Download size={14} /> {$t.export.xlsxButton}
+      </Button>
+      <Button disabled={busy} onclick={exportCsv}>
+        <Download size={14} /> {$t.export.csvButton}
+      </Button>
     </div>
   </section>
 
   <section class="panel p-5">
-    <div class="hud mb-1">BACKUP DATABASE</div>
+    <div class="hud mb-1">{$t.export.backupSectionTitle}</div>
     <p class="text-sm mb-4" style="color: var(--fg-2)">
-      Salva o ripristina l'intero database locale (gare, percorsi, atleti, tempi).
-      Il ripristino <strong>sostituisce</strong> tutti i dati attuali.
+      {@html $t.export.backupDescription}
     </p>
     <div class="flex flex-wrap gap-3">
-      <Button variant="primary" disabled={busy} onclick={backup}><Download size={14} /> SALVA BACKUP</Button>
-      <Button disabled={busy} onclick={pickRestore}><Upload size={14} /> RIPRISTINA…</Button>
+      <Button variant="primary" disabled={busy} onclick={backup}>
+        <Download size={14} /> {$t.export.backupButton}
+      </Button>
+      <Button disabled={busy} onclick={pickRestore}>
+        <Upload size={14} /> {$t.export.restoreButton}
+      </Button>
     </div>
   </section>
 </div>
 
 {#if confirmRestore}
   <ConfirmModal
-    title="RIPRISTINA BACKUP"
-    message="Tutti i dati attuali verranno sostituiti con il contenuto del backup. Operazione irreversibile. Procedere?"
-    confirmLabel="RIPRISTINA"
+    title={$t.export.restoreConfirmTitle}
+    message={$t.export.restoreConfirmMessage}
+    confirmLabel={$t.export.restoreConfirmButton}
     onCancel={() => (confirmRestore = null)}
     onConfirm={() => {
       const p = confirmRestore!;

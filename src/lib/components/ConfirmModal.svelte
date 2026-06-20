@@ -1,10 +1,11 @@
 <script lang="ts">
   import Button from '../ui/Button.svelte';
+  import { t } from '../i18n';
 
   let {
     message,
-    title = 'CONFERMA',
-    confirmLabel = 'CONFERMA',
+    title,
+    confirmLabel,
     danger = true,
     onCancel,
     onConfirm,
@@ -32,7 +33,7 @@
       style="border-color: var(--line-2); background: var(--bg-2)"
     >
       <div class="hud-strong" style="color: {danger ? 'var(--accent-finish)' : 'var(--fg-0)'}">
-        {title}
+        {title ?? $t.modals.confirm.title}
       </div>
       <Button variant="ghost" size="sm" onclick={onCancel}>ESC</Button>
     </div>
@@ -40,7 +41,7 @@
     <div class="p-6">
       <p class="text-sm" style="color: var(--fg-1)">{message}</p>
       <div class="flex gap-2 mt-6">
-        <Button class="flex-1 py-3" onclick={onCancel}>ANNULLA</Button>
+        <Button class="flex-1 py-3" onclick={onCancel}>{$t.common.cancel}</Button>
         <Button
           class="flex-1 py-3"
           style={danger
@@ -48,7 +49,7 @@
             : ''}
           onclick={onConfirm}
         >
-          {confirmLabel}
+          {confirmLabel ?? $t.common.confirm}
         </Button>
       </div>
     </div>

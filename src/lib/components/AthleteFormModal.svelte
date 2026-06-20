@@ -5,6 +5,7 @@
   import { courses } from '../stores';
   import Button from '../ui/Button.svelte';
   import { TriangleAlert } from 'lucide-svelte';
+  import { t } from '../i18n';
 
   let { athlete = null, onClose }: {
     athlete?: Athlete | null;
@@ -28,10 +29,10 @@
   async function save() {
     error = null;
     const n = parseInt(bib);
-    if (!Number.isFinite(n) || n <= 0) { error = 'pettorale non valido'; return; }
-    if (!firstName.trim() && !lastName.trim()) { error = 'nome o cognome obbligatorio'; return; }
+    if (!Number.isFinite(n) || n <= 0) { error = $t.modals.athleteForm.errorInvalidBib; return; }
+    if (!firstName.trim() && !lastName.trim()) { error = $t.modals.athleteForm.errorNameRequired; return; }
     const isNew = courseSel === NEW_COURSE;
-    if (isNew && !newCourseName.trim()) { error = 'nome percorso obbligatorio'; return; }
+    if (isNew && !newCourseName.trim()) { error = $t.modals.athleteForm.errorCourseRequired; return; }
     busy = true;
     try {
       await api.saveAthlete(athlete?.id ?? null, {
@@ -62,14 +63,14 @@
   <div class="panel-2 w-full max-w-lg">
     <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
       <div class="hud-strong" style="color: var(--accent-running)">
-        {athlete ? 'MODIFICA ATLETA' : 'NUOVO ATLETA'}
+        {athlete ? $t.modals.athleteForm.titleEdit : $t.modals.athleteForm.titleAdd}
       </div>
       <Button variant="ghost" size="sm" onclick={() => onClose(false)}>ESC</Button>
     </div>
 
     <div class="p-6 flex flex-col gap-4">
       <label class="flex flex-col gap-1">
-        <span class="hud">PETTORALE</span>
+        <span class="hud">{$t.modals.athleteForm.bibLabel}</span>
         <!-- svelte-ignore a11y_autofocus -->
         <input bind:value={bib} type="number" inputmode="numeric"
                class="num text-2xl" autofocus autocomplete="off" placeholder="—" />
@@ -77,33 +78,33 @@
 
       <div class="grid grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
-          <span class="hud">NOME</span>
+          <span class="hud">{$t.modals.athleteForm.firstNameLabel}</span>
           <input bind:value={firstName} autocomplete="off" />
         </label>
         <label class="flex flex-col gap-1">
-          <span class="hud">COGNOME</span>
+          <span class="hud">{$t.modals.athleteForm.lastNameLabel}</span>
           <input bind:value={lastName} autocomplete="off" />
         </label>
       </div>
 
       <label class="flex flex-col gap-1">
-        <span class="hud">CATEGORIA (opzionale)</span>
+        <span class="hud">{$t.modals.athleteForm.categoryLabel}</span>
         <input bind:value={category} autocomplete="off" placeholder="es. M40, SF, U23" />
       </label>
 
       <label class="flex flex-col gap-1">
-        <span class="hud">PERCORSO</span>
+        <span class="hud">{$t.modals.athleteForm.courseLabel}</span>
         <select bind:value={courseSel}>
           {#each $courses as c (c.id)}
             <option value={String(c.id)}>{c.name}</option>
           {/each}
-          <option value={NEW_COURSE}>nuovo percorso…</option>
+          <option value={NEW_COURSE}>{$t.modals.athleteForm.newCourseOption}</option>
         </select>
       </label>
 
       {#if courseSel === NEW_COURSE}
         <label class="flex flex-col gap-1">
-          <span class="hud">NOME NUOVO PERCORSO</span>
+          <span class="hud">{$t.modals.athleteForm.newCourseLabel}</span>
           <input bind:value={newCourseName} placeholder="es. 21K" autocomplete="off" />
         </label>
       {/if}
@@ -114,9 +115,9 @@
 
       <div class="flex gap-2 mt-2">
         <Button variant="primary" class="flex-1 py-3" disabled={busy} onclick={save}>
-          {athlete ? 'SALVA' : 'AGGIUNGI'}
+          {athlete ? $t.modals.athleteForm.saveButton : $t.modals.athleteForm.addButton}
         </Button>
-        <Button class="flex-1 py-3" onclick={() => onClose(false)}>ANNULLA</Button>
+        <Button class="flex-1 py-3" onclick={() => onClose(false)}>{$t.common.cancel}</Button>
       </div>
     </div>
   </div>

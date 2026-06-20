@@ -11,6 +11,7 @@
   import Button from '../ui/Button.svelte';
   import BibCombobox from './BibCombobox.svelte';
   import { Play, Flag, Check, X, ArrowLeftRight, Undo2 } from 'lucide-svelte';
+  import { t, i } from '../i18n';
 
   let {
     course,
@@ -145,7 +146,7 @@
   async function doAssign(pid: number) {
     error = null;
     const athlete = selectedAthletes[pid];
-    if (!athlete) { error = 'seleziona un atleta'; return; }
+    if (!athlete) { error = $t.lane.errorSelectAthlete; return; }
     try {
       await api.assignPending(pid, athlete.bib_number);
       const next = { ...selectedAthletes };
@@ -196,7 +197,7 @@
   function doDeletePending(pid: number, tsMs: number) {
     const label = formatMsToHms(tsMs % 86_400_000);
     confirmState = {
-      message: `Eliminare il tempo ${label}? Operazione irreversibile.`,
+      message: i($t.lane.confirmDeleteTime, { label }),
       onConfirm: async () => {
         error = null;
         try {
@@ -214,7 +215,7 @@
 
   function doUndoFinish(timingId: number, bib: number) {
     confirmState = {
-      message: `Annullare l'arrivo del pettorale #${bib}? L'atleta torna in gara.`,
+      message: i($t.lane.confirmUndoFinish, { bib }),
       onConfirm: async () => {
         error = null;
         try {
@@ -259,7 +260,7 @@
   async function doSaveAthleteName(a: Athlete) {
     const first = editAthleteFirst.trim();
     const last = editAthleteLast.trim();
-    if (!first && !last) { error = 'inserisci almeno nome o cognome'; return; }
+    if (!first && !last) { error = $t.lane.errorNameRequired; return; }
     error = null;
     try {
       await api.saveAthlete(a.id, {
@@ -281,7 +282,7 @@
   async function commitEditBib(timingId: number) {
     const n = parseInt(editBibInput.trim());
     if (!Number.isFinite(n) || n <= 0) {
-      error = 'pettorale non valido';
+      error = $t.lane.errorInvalidBib;
       return;
     }
     error = null;
@@ -366,21 +367,21 @@
             ? 'var(--accent-running)'
             : 'var(--fg-3)'}"
       >
-        {ended ? 'TERMINATA' : started ? 'ACTIVE' : 'STANDBY'}
+        {ended ? $t.lane.statusEnded : started ? $t.lane.statusActive : $t.lane.statusStandby}
       </span>
 
       {#if started && !ended}
         <Button
           variant="finish"
           size="sm"
-          title="Termina gara"
-          ariaLabel="Termina gara"
+          title={$t.lane.endCourseTitle}
+          ariaLabel={$t.lane.endCourseTitle}
           onclick={(e) => {
             e.stopPropagation();
             showEndModal = true;
           }}
         >
-          <Flag size={14} /> TERMINA
+          <Flag size={14} /> {$t.lane.endLabel}
         </Button>
       {/if}
 
@@ -388,14 +389,14 @@
         <Button
           variant="tap"
           size="sm"
-          title="Riavvia gara (azzera timer)"
-          ariaLabel="Riavvia gara"
+          title={$t.lane.restartCourseTitle}
+          ariaLabel={$t.lane.restartCourseTitle}
           onclick={(e) => {
             e.stopPropagation();
             showRestartModal = true;
           }}
         >
-          ↻ RIAVVIA
+          {$t.lane.restartLabel}
         </Button>
       {/if}
     </div>
@@ -427,7 +428,7 @@
         disabled={busy}
         onclick={doStart}
       >
-        <Play size={16} /> START PERCORSO
+        <Play size={16} /> {$t.lane.startCourse}
       </Button>
     {:else if ended}
       <Button
@@ -435,7 +436,7 @@
         style="padding: 1rem 1rem; color: var(--fg-3); cursor: default"
         disabled
       >
-        <Flag size={16} /> GARA TERMINATA
+        <Flag size={16} /> {$t.lane.courseEnded}
       </Button>
     {:else}
       <div class="flex gap-2">
@@ -445,7 +446,7 @@
           style="padding: 1rem 1rem; letter-spacing: 0.06em"
           onclick={doRecord}
         >
-          RECORD TIME
+          {$t.lane.recordTime}
           {#if active}
             <span
               class="kbd ml-2"
@@ -457,14 +458,14 @@
         <button
           class="btn-tie"
           title={pending.length > 0
-            ? `Aggiunge un atleta con lo stesso tempo dell'ultimo arrivo (${formatMsToHms(pending[0].finish_timestamp_ms % 86_400_000)})`
-            : 'Disponibile dopo il primo RECORD'}
+            ? `+1 ${$t.lane.sameTime} (${formatMsToHms(pending[0].finish_timestamp_ms % 86_400_000)})`
+            : `${$t.lane.sameTime} — ${$t.common.comingSoon}`}
           aria-label="Cattura tempo identico"
           disabled={pending.length === 0}
           onclick={doTie}
         >
           <span class="num text-base font-bold">+1</span>
-          <span class="tie-label">STESSO TEMPO</span>
+          <span class="tie-label">{$t.lane.sameTime}</span>
         </button>
       </div>
     {/if}
@@ -473,7 +474,7 @@
   <!-- Checkpoint split capture -->
   {#if started && !ended && courseCheckpoints.length > 0}
     <div class="px-3 py-2 border-b flex items-center gap-2" style="border-color: var(--line-2); background: var(--bg-1)">
-      <span class="hud" style="color: var(--fg-3)">SPLIT</span>
+      <span class="hud" style="color: var(--fg-3)">{$t.lane.splitLabel}</span>
       <select bind:value={splitCheckpointId} class="text-sm" style="max-width: 9rem">
         {#each courseCheckpoints as cp (cp.id)}
           <option value={cp.id}>{cp.name}</option>
@@ -483,7 +484,7 @@
         <BibCombobox
           athletes={courseAthletes}
           compact
-          placeholder="# o nome → parziale"
+          placeholder={$t.lane.splitPlaceholder}
           onSelect={(a) => a && doRecordSplit(a.bib_number)}
         />
       </div>
@@ -496,7 +497,7 @@
       class="flex items-center justify-between px-3 py-2 border-b shrink-0"
       style="border-color: var(--line-1); background: var(--bg-1)"
     >
-      <div class="hud">ARRIVI / DA ASSEGNARE</div>
+      <div class="hud">{$t.lane.historyHeader}</div>
       <div class="hud">
         <span style="color: var(--accent-pending)">{pendingCount}</span>
         <span style="color: var(--fg-3)"> / {finishers.length}</span>
@@ -506,14 +507,12 @@
     {#if rows.length === 0}
       <div class="flex-1 flex items-center justify-center px-4 py-8">
         <div class="text-center">
-          <div class="hud mb-1" style="color: var(--fg-3)">NESSUN ARRIVO</div>
+          <div class="hud mb-1" style="color: var(--fg-3)">{$t.lane.noFinishes}</div>
           <div class="text-xs" style="color: var(--fg-3)">
             {#if started}
-              Premi <span class="kbd">RECORD</span>
-              {#if active}o <span class="kbd">␣</span>{/if}
-              per catturare un tempo
+              {$t.lane.pressRecord}
             {:else}
-              Avvia il percorso per iniziare a cronometrare
+              {$t.lane.startFirst}
             {/if}
           </div>
         </div>
@@ -540,7 +539,7 @@
               </span>
               {#if movingPendingId === r.p.id}
                 <div class="row-main">
-                  <span class="row-hint">sposta in:</span>
+                  <span class="row-hint">{$t.lane.moveToLabel}</span>
                   {#each $courses.filter(c => c.id !== course.id) as c (c.id)}
                     <button
                       type="button"
@@ -552,7 +551,7 @@
                     type="button"
                     class="btn-row"
                     onclick={() => (movingPendingId = null)}
-                    title="Annulla"
+                    title={$t.common.cancel}
                   ><X size={14} /></button>
                 </div>
               {:else}
@@ -576,8 +575,8 @@
                     type="submit"
                     class="btn-row btn-row-confirm"
                     disabled={!selectedAthletes[r.p.id]}
-                    title="Assegna pettorale"
-                    aria-label="Assegna pettorale"
+                    title={$t.modals.assignBib.confirmLabel}
+                    aria-label={$t.modals.assignBib.confirmLabel}
                   >
                     <Check size={14} />
                   </button>
@@ -585,8 +584,8 @@
                     <button
                       type="button"
                       class="btn-row"
-                      title="Sposta in altro percorso"
-                      aria-label="Sposta percorso"
+                      title={$t.lane.moveToLabel}
+                      aria-label={$t.lane.moveToLabel}
                       onclick={(e) => {
                         e.stopPropagation();
                         movingPendingId = r.p.id;
@@ -596,8 +595,8 @@
                   <button
                     type="button"
                     class="btn-row btn-row-danger"
-                    title="Elimina tempo"
-                    aria-label="Elimina tempo"
+                    title={$t.common.delete}
+                    aria-label={$t.common.delete}
                     onclick={(e) => {
                       e.stopPropagation();
                       doDeletePending(r.p.id, r.p.finish_timestamp_ms);
@@ -636,12 +635,12 @@
                     placeholder="BIB"
                     autocomplete="off"
                   />
-                  <span class="row-hint">nuovo pettorale</span>
-                  <button type="submit" class="btn-row btn-row-confirm" title="Salva"><Check size={14} /></button>
+                  <span class="row-hint">{$t.lane.newBibHint}</span>
+                  <button type="submit" class="btn-row btn-row-confirm" title={$t.common.save}><Check size={14} /></button>
                   <button
                     type="button"
                     class="btn-row"
-                    title="Annulla"
+                    title={$t.common.cancel}
                     onclick={(e) => { e.stopPropagation(); cancelEditBib(); }}
                   ><Undo2 size={14} /></button>
                 </form>
@@ -655,7 +654,7 @@
                     type="text"
                     class="bib-input"
                     bind:value={editAthleteFirst}
-                    placeholder="Nome"
+                    placeholder={$t.lane.firstNamePlaceholder}
                     autocomplete="off"
                     autofocus
                   />
@@ -663,14 +662,14 @@
                     type="text"
                     class="bib-input"
                     bind:value={editAthleteLast}
-                    placeholder="Cognome"
+                    placeholder={$t.lane.lastNamePlaceholder}
                     autocomplete="off"
                   />
-                  <button type="submit" class="btn-row btn-row-confirm" title="Salva"><Check size={14} /></button>
+                  <button type="submit" class="btn-row btn-row-confirm" title={$t.common.save}><Check size={14} /></button>
                   <button
                     type="button"
                     class="btn-row"
-                    title="Annulla"
+                    title={$t.common.cancel}
                     onclick={(e) => { e.stopPropagation(); cancelEditAthleteName(); }}
                   ><Undo2 size={14} /></button>
                 </form>
@@ -678,7 +677,7 @@
                 <div class="row-main">
                   <span class="row-bib num">#{r.f.athlete.bib_number}</span>
                   {#if anon}
-                    <span class="anon-badge">SENZA NOME</span>
+                    <span class="anon-badge">{$t.lane.anonBadge}</span>
                   {:else}
                     <span class="row-name truncate">
                       {r.f.athlete.first_name} {r.f.athlete.last_name}
@@ -688,16 +687,16 @@
                     type="button"
                     class="btn-row"
                     class:btn-row-warn={anon}
-                    title="Modifica nome atleta"
-                    aria-label="Modifica nome"
+                    title={$t.common.edit}
+                    aria-label={$t.common.edit}
                     onclick={(e) => { e.stopPropagation(); startEditAthleteName(r.f.athlete); }}
                   >✎</button>
                   {#if r.f.timing_id != null}
                     <button
                       type="button"
                       class="btn-row"
-                      title="Modifica pettorale"
-                      aria-label="Modifica pettorale"
+                      title={$t.lane.newBibHint}
+                      aria-label={$t.lane.newBibHint}
                       onclick={(e) => {
                         e.stopPropagation();
                         startEditBib(r.f.timing_id!, r.f.athlete.bib_number);
@@ -706,8 +705,8 @@
                     <button
                       type="button"
                       class="btn-row btn-row-danger"
-                      title="Annulla arrivo"
-                      aria-label="Annulla arrivo"
+                      title={$t.common.cancel}
+                      aria-label={$t.common.cancel}
                       onclick={(e) => {
                         e.stopPropagation();
                         doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);

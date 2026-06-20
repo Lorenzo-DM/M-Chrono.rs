@@ -5,6 +5,8 @@
   import AthleteImportPanel from './AthleteImportPanel.svelte';
   import RaceSetupPanel from './RaceSetupPanel.svelte';
   import { TriangleAlert, ArrowLeft, ArrowRight } from 'lucide-svelte';
+  import { locale, SUPPORTED_LOCALES, t } from '../i18n';
+  import type { Locale } from '../i18n';
 
   let { onReady }: { onReady: () => void } = $props();
 
@@ -17,13 +19,12 @@
   let raceConfigured = $state(false);
 
   const stepCount = 3;
-  const stepLabels = ['OPERATORE', 'GARA', 'ATLETI'];
 
   async function nextStep() {
     if (step === 0) {
       error = null;
       if (!operatorId.trim()) {
-        error = 'nome operatore obbligatorio';
+        error = $t.intro.step0.operatorRequired;
         return;
       }
       saving = true;
@@ -55,7 +56,7 @@
   <header class="px-8 py-5 border-b" style="border-color: var(--line-2)">
     <div class="flex items-end justify-between gap-8">
       <div>
-        <div class="hud" style="color: var(--fg-3)">CONFIGURAZIONE INIZIALE</div>
+        <div class="hud" style="color: var(--fg-3)">{$t.intro.initialSetup}</div>
         <div class="text-2xl font-semibold mt-1" style="color: var(--fg-0); letter-spacing: -0.01em">
           M-Chrono
         </div>
@@ -69,7 +70,7 @@
           {/each}
         </div>
         <div class="flex justify-between mt-2">
-          {#each stepLabels as label, i (label)}
+          {#each $t.intro.stepLabels as label, i (label)}
             <div class="hud text-[0.62rem]"
                  style="color: {i === step ? 'var(--fg-0)' : (i < step ? 'var(--fg-2)' : 'var(--fg-3)')}">
               {String(i + 1).padStart(2, '0')} · {label}
@@ -86,34 +87,45 @@
 
       {#if step === 0}
         <section class="reveal">
-          <div class="hud reveal reveal-1" style="color: var(--fg-3)">BENVENUTO</div>
+          <div class="hud reveal reveal-1" style="color: var(--fg-3)">{$t.intro.step0.welcome}</div>
           <h1 class="text-5xl font-semibold mt-3 reveal reveal-2"
               style="color: var(--fg-0); letter-spacing: -0.02em; line-height: 1.05">
-            Chi sta<br>cronometrando?
+            {#each $t.intro.step0.title.split('\n') as line, idx (idx)}
+              {line}{#if idx < $t.intro.step0.title.split('\n').length - 1}<br>{/if}
+            {/each}
           </h1>
           <p class="mt-6 text-lg leading-relaxed reveal reveal-3" style="color: var(--fg-1); max-width: 56ch">
-            Un nome che identifica questa postazione nei record di
-            cronometraggio. Tutto il resto — atleti, sincronizzazione, tema —
-            si configura dopo, quando serve.
+            {$t.intro.step0.description}
           </p>
 
-          <label class="mt-10 max-w-md block reveal reveal-4">
-            <span class="hud block mb-2">NOME OPERATORE</span>
+          <div class="mt-8 max-w-md reveal reveal-4">
+            <span class="hud block mb-2">{$t.locale.label}</span>
+            <select
+              value={$locale}
+              onchange={(e) => locale.set((e.target as HTMLSelectElement).value as Locale)}
+            >
+              {#each SUPPORTED_LOCALES as l (l.code)}
+                <option value={l.code}>{l.nativeName}</option>
+              {/each}
+            </select>
+          </div>
+
+          <label class="mt-6 max-w-md block reveal reveal-5">
+            <span class="hud block mb-2">{$t.intro.step0.operatorLabel}</span>
             <!-- svelte-ignore a11y_autofocus -->
-            <input bind:value={operatorId} placeholder="es. PC-A, PC-B"
+            <input bind:value={operatorId} placeholder={$t.intro.step0.operatorPlaceholder}
                    autofocus class="w-full text-2xl py-3" />
           </label>
         </section>
 
       {:else if step === 1}
         <section class="reveal">
-          <div class="hud" style="color: var(--fg-3)">PASSAGGIO 02 / 03</div>
+          <div class="hud" style="color: var(--fg-3)">{$t.intro.step1.step}</div>
           <h2 class="text-3xl font-semibold mt-2" style="color: var(--fg-0); letter-spacing: -0.01em">
-            Crea la gara e i percorsi
+            {$t.intro.step1.title}
           </h2>
           <p class="mt-3 max-w-xl" style="color: var(--fg-2)">
-            Dai un nome alla gara e aggiungi i percorsi (es. 21K, 10K).
-            Puoi saltare e configurarli dopo dalle impostazioni.
+            {$t.intro.step1.description}
           </p>
 
           <div class="mt-8">
@@ -123,13 +135,12 @@
 
       {:else}
         <section class="reveal">
-          <div class="hud" style="color: var(--fg-3)">PASSAGGIO 03 / 03</div>
+          <div class="hud" style="color: var(--fg-3)">{$t.intro.step2.step}</div>
           <h2 class="text-3xl font-semibold mt-2" style="color: var(--fg-0); letter-spacing: -0.01em">
-            Importa gli atleti
+            {$t.intro.step2.title}
           </h2>
           <p class="mt-3 max-w-xl" style="color: var(--fg-2)">
-            Carica un foglio Excel o CSV, aggiungili a mano, oppure salta:
-            puoi importarli in qualsiasi momento dalle impostazioni.
+            {$t.intro.step2.description}
           </p>
 
           <div class="mt-8">
@@ -149,26 +160,26 @@
           style="border-color: var(--line-2); background: var(--bg-1)">
     <div>
       {#if step > 0}
-        <Button variant="ghost" onclick={() => (step -= 1)}><ArrowLeft size={14} /> INDIETRO</Button>
+        <Button variant="ghost" onclick={() => (step -= 1)}><ArrowLeft size={14} /> {$t.common.back}</Button>
       {/if}
     </div>
 
     <div class="flex items-center gap-3">
       {#if step === 1 && !raceConfigured}
-        <Button variant="ghost" onclick={() => (step = 2)} title="Configura la gara più tardi dalle impostazioni">
-          SALTA — CONFIGURA PIÙ TARDI
+        <Button variant="ghost" onclick={() => (step = 2)} title={$t.intro.skipConfigureLater}>
+          {$t.intro.skipConfigureLater}
         </Button>
       {/if}
       {#if step === 2 && !imported}
-        <Button variant="ghost" onclick={onReady} title="Importa più tardi dalle impostazioni">
-          SALTA — IMPORTA PIÙ TARDI
+        <Button variant="ghost" onclick={onReady} title={$t.intro.skipImportLater}>
+          {$t.intro.skipImportLater}
         </Button>
       {/if}
       <Button variant="primary" class="px-6 py-3" disabled={saving} onclick={nextStep}>
         {#if step === 2}
-          AVVIA WORKSPACE <ArrowRight size={14} />
+          {$t.intro.launchWorkspace} <ArrowRight size={14} />
         {:else}
-          AVANTI <ArrowRight size={14} />
+          {$t.common.next} <ArrowRight size={14} />
         {/if}
       </Button>
     </div>

@@ -8,6 +8,7 @@
   import Button from '../ui/Button.svelte';
   import { TriangleAlert } from 'lucide-svelte';
   import ConfirmModal from './ConfirmModal.svelte';
+  import { t, i } from '../i18n';
 
   let selectedCourseId = $state<number | null>(null);
   let rows = $state<ResultRow[]>([]);
@@ -17,7 +18,6 @@
   let error = $state<string | null>(null);
   let confirmState = $state<{ message: string; onConfirm: () => void } | null>(null);
 
-  // Default to the active timing course, else the first course.
   $effect(() => {
     if (selectedCourseId == null) {
       selectedCourseId = $activeCourseId ?? $courses[0]?.id ?? null;
@@ -68,7 +68,6 @@
     }),
   );
 
-  // Finishers keep their overall position; non-finishers render after them.
   let positioned = $derived.by(() => {
     let pos = 0;
     return filtered.map((r) => {
@@ -79,13 +78,7 @@
   });
 
   function statusLabel(s: string): string {
-    switch (s) {
-      case 'Finished': return 'ARRIVATO';
-      case 'Running': return 'IN GARA';
-      case 'Withdrawn': return 'RITIRATO';
-      case 'DNS': return 'NON PARTITO';
-      default: return s.toUpperCase();
-    }
+    return $t.results.statuses[s as keyof typeof $t.results.statuses] ?? s.toUpperCase();
   }
 
   function statusColor(s: string): string {
@@ -101,7 +94,7 @@
   function doWithdraw(r: ResultRow) {
     if (r.athlete_id == null) return;
     confirmState = {
-      message: `Segnare il pettorale #${r.bib_number} come RITIRATO?`,
+      message: i($t.results.confirmWithdraw, { bib: r.bib_number ?? '?' }),
       onConfirm: async () => {
         try {
           await api.withdrawByAthleteId(r.athlete_id!);
@@ -114,7 +107,7 @@
   function doDns(r: ResultRow) {
     if (r.athlete_id == null) return;
     confirmState = {
-      message: `Segnare il pettorale #${r.bib_number} come NON PARTITO (DNS)?`,
+      message: i($t.results.confirmDns, { bib: r.bib_number ?? '?' }),
       onConfirm: async () => {
         try {
           await api.markDnsByAthleteId(r.athlete_id!);
@@ -130,17 +123,17 @@
 <div class="p-6 max-w-5xl mx-auto">
   <div class="flex items-center justify-between mb-5">
     <div>
-      <div class="hud" style="color: var(--fg-3)">CLASSIFICA</div>
-      <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">RESULTS</h2>
+      <div class="hud" style="color: var(--fg-3)">{$t.results.subtitle}</div>
+      <h2 class="hud-strong text-2xl mt-1" style="color: var(--fg-0)">{$t.results.title}</h2>
     </div>
     <div class="hud" style="color: var(--fg-3)">
-      <span style="color: var(--accent-finish)">{finishedCount}</span> arrivati / {rows.length}
+      {i($t.results.finishersCount, { count: finishedCount, total: rows.length })}
     </div>
   </div>
 
   <div class="flex flex-wrap items-end gap-3 mb-4">
     <label class="flex flex-col gap-1">
-      <span class="hud">PERCORSO</span>
+      <span class="hud">{$t.results.courseLabel}</span>
       <select bind:value={selectedCourseId}>
         {#each $courses as c (c.id)}
           <option value={c.id}>{c.name}</option>
@@ -149,9 +142,9 @@
     </label>
     {#if categories.length > 0}
       <label class="flex flex-col gap-1">
-        <span class="hud">CATEGORIA</span>
+        <span class="hud">{$t.results.categoryLabel}</span>
         <select bind:value={categoryFilter}>
-          <option value="">Tutte</option>
+          <option value="">{$t.results.allCategories}</option>
           {#each categories as cat (cat)}
             <option value={cat}>{cat}</option>
           {/each}
@@ -159,8 +152,8 @@
       </label>
     {/if}
     <label class="flex flex-col gap-1 flex-1 max-w-xs">
-      <span class="hud">CERCA</span>
-      <input bind:value={filter} placeholder="pettorale, nome, categoria…" autocomplete="off" />
+      <span class="hud">{$t.results.searchLabel}</span>
+      <input bind:value={filter} placeholder={$t.results.searchPlaceholder} autocomplete="off" />
     </label>
   </div>
 
@@ -169,22 +162,22 @@
   {/if}
 
   {#if busy && rows.length === 0}
-    <div class="hud" style="color: var(--fg-3)">CARICAMENTO…</div>
+    <div class="hud" style="color: var(--fg-3)">{$t.common.loading}</div>
   {:else if filtered.length === 0}
     <div class="panel p-8 text-center">
-      <div class="hud" style="color: var(--fg-3)">NESSUN RISULTATO</div>
+      <div class="hud" style="color: var(--fg-3)">{$t.results.noResults}</div>
     </div>
   {:else}
     <div class="panel" style="overflow: hidden">
       <table class="w-full text-sm">
         <thead>
           <tr class="hud text-left" style="background: var(--bg-2)">
-            <th class="px-3 py-2">POS</th>
-            <th class="px-3 py-2">PETT.</th>
-            <th class="px-3 py-2">ATLETA</th>
-            <th class="px-3 py-2">CAT.</th>
-            <th class="px-3 py-2">TEMPO</th>
-            <th class="px-3 py-2">STATO</th>
+            <th class="px-3 py-2">{$t.results.columns.pos}</th>
+            <th class="px-3 py-2">{$t.results.columns.bib}</th>
+            <th class="px-3 py-2">{$t.results.columns.name}</th>
+            <th class="px-3 py-2">{$t.results.columns.category}</th>
+            <th class="px-3 py-2">{$t.results.columns.time}</th>
+            <th class="px-3 py-2">{$t.results.columns.status}</th>
             <th class="px-3 py-2"></th>
           </tr>
         </thead>
@@ -199,7 +192,7 @@
                 {#if r.first_name || r.last_name}
                   {r.first_name ?? ''} {r.last_name ?? ''}
                 {:else}
-                  <span class="hud" style="color: var(--accent-pending)">SENZA NOME</span>
+                  <span class="hud" style="color: var(--accent-pending)">{$t.results.anonymous}</span>
                 {/if}
                 {#if r.duplicate_flagged}
                   <span class="hud ml-2" style="color: var(--accent-finish)">DUP</span>
@@ -214,8 +207,12 @@
               </td>
               <td class="px-3 py-1.5 text-right whitespace-nowrap">
                 {#if r.status === 'Running'}
-                  <Button variant="ghost" size="sm" onclick={() => doWithdraw(r)} title="Ritira">RIT</Button>
-                  <Button variant="ghost" size="sm" onclick={() => doDns(r)} title="Non partito">DNS</Button>
+                  <Button variant="ghost" size="sm" onclick={() => doWithdraw(r)} title={$t.results.withdrawButton}>
+                    {$t.results.withdrawButton}
+                  </Button>
+                  <Button variant="ghost" size="sm" onclick={() => doDns(r)} title={$t.results.dnsButton}>
+                    {$t.results.dnsButton}
+                  </Button>
                 {/if}
               </td>
             </tr>

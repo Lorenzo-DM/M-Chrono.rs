@@ -13,6 +13,7 @@
   import ExportPage from './lib/components/ExportPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
   import IntroFlow from './lib/components/IntroFlow.svelte';
+  import { t } from './lib/i18n';
 
   type View = NavView | 'intro';
   let view = $state<View>('timing');
@@ -105,7 +106,7 @@
       >
         M-Chrono
       </div>
-      <div class="hud mt-2" style="color: var(--fg-3)">CARICAMENTO…</div>
+      <div class="hud mt-2" style="color: var(--fg-3)">{$t.common.loading}</div>
     </div>
   </main>
 {:else if view === 'intro'}
