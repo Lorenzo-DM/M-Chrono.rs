@@ -17,7 +17,8 @@
     "@skeletonlabs/skeleton-svelte": "^4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/plugin-opener": "^2",
+    "lucide-svelte": "^1.0.1"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4",
