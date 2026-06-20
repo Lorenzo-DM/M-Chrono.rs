@@ -10,6 +10,7 @@
     LayoutPanelTop, Columns2, LayoutGrid,
     Menu, Sun, Moon, TriangleAlert,
   } from 'lucide-svelte';
+  import { t } from '../i18n';
 
   type LucideIcon = typeof Timer;
 
@@ -23,12 +24,12 @@
     onDuplicates: () => void;
   }>();
 
-  const navItems: { id: NavView; label: string; icon: LucideIcon; enabled: boolean }[] = [
-    { id: 'timing',   label: 'Timing',   icon: Timer,       enabled: true },
-    { id: 'results',  label: 'Results',  icon: ListOrdered, enabled: true },
-    { id: 'settings', label: 'Settings', icon: Settings,    enabled: true },
-    { id: 'export',   label: 'Export',   icon: Download,    enabled: true },
-  ];
+  let navItems = $derived([
+    { id: 'timing'   as NavView, label: $t.nav.timing,   icon: Timer,       enabled: true },
+    { id: 'results'  as NavView, label: $t.nav.results,  icon: ListOrdered, enabled: true },
+    { id: 'settings' as NavView, label: $t.nav.settings, icon: Settings,    enabled: true },
+    { id: 'export'   as NavView, label: $t.nav.export,   icon: Download,    enabled: true },
+  ]);
 
   const modes: { id: LayoutMode; label: string; icon: LucideIcon }[] = [
     { id: 'tabs',  label: 'Tabs',  icon: LayoutPanelTop },
@@ -78,9 +79,8 @@
     <!-- Brand -->
     <div class="flex items-center gap-3 shrink-0">
       <div class="hud-strong text-sm sm:text-base" style="color: var(--fg-0); letter-spacing: 0.08em">
-        TRAIL<span style="color: var(--accent-running)">·</span>TRACE
+        M<span style="color: var(--accent-running)">-</span>Chrono
       </div>
-      <div class="hud hidden sm:block" style="color: var(--fg-3)">CHRONO v0.1</div>
     </div>
 
     <div class="flex-1"></div>
@@ -131,7 +131,7 @@
             data-disabled={!n.enabled}
             disabled={!n.enabled}
             onclick={() => n.enabled && onNav(n.id)}
-            title={n.enabled ? n.label : `${n.label} — prossimamente`}
+            title={n.enabled ? n.label : `${n.label} — ${$t.common.comingSoon}`}
           >
             <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
             {n.label}
@@ -141,7 +141,7 @@
 
       <div class="flex-1"></div>
 
-      <!-- Layout switcher (timing view only; slot kept to avoid nav shift) -->
+      <!-- Layout switcher -->
       <div class:invisible={current !== 'timing'} aria-hidden={current !== 'timing'}>
         <SegmentedControl
           ariaLabel="Layout"
@@ -186,14 +186,14 @@
           variant="ghost"
           size="sm"
           onclick={cycleQuickToggle}
-          title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
-          ariaLabel="Cambia tema"
+          title={$resolvedTheme === 'dark' ? $t.header.switchToLight : $t.header.switchToDark}
+          ariaLabel={$t.header.changeTheme}
         >
           {#if $resolvedTheme === 'dark'}<Sun size={16} />{:else}<Moon size={16} />{/if}
         </Button>
 
         {#if $config?.sync_enabled}
-          <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title={$t.header.duplicates}>
             <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
           </Button>
         {/if}
@@ -215,7 +215,7 @@
             data-disabled={!n.enabled}
             disabled={!n.enabled}
             onclick={() => n.enabled && navClick(n.id)}
-            title={n.enabled ? n.label : `${n.label} — prossimamente`}
+            title={n.enabled ? n.label : `${n.label} — ${$t.common.comingSoon}`}
           >
             <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
             {n.label}
@@ -245,14 +245,18 @@
           variant="ghost"
           size="sm"
           onclick={cycleQuickToggle}
-          title={$resolvedTheme === 'dark' ? 'Passa a chiaro' : 'Passa a scuro'}
-          ariaLabel="Cambia tema"
+          title={$resolvedTheme === 'dark' ? $t.header.switchToLight : $t.header.switchToDark}
+          ariaLabel={$t.header.changeTheme}
         >
-          {#if $resolvedTheme === 'dark'}<Sun size={16} /> Chiaro{:else}<Moon size={16} /> Scuro{/if}
+          {#if $resolvedTheme === 'dark'}
+            <Sun size={16} /> {$t.header.switchToLight}
+          {:else}
+            <Moon size={16} /> {$t.header.switchToDark}
+          {/if}
         </Button>
 
         {#if $config?.sync_enabled}
-          <Button variant="ghost" size="sm" onclick={duplicatesClick} title="Duplicati">
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title={$t.header.duplicates}>
             <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
           </Button>
         {/if}
