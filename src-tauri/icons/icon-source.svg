@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 1024 1024"
+   width="1024"
+   height="1024"
+   version="1.1"
+   id="svg11"
+   sodipodi:docname="icon-source.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs11" />
+  <sodipodi:namedview
+     id="namedview11"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.7080185"
+     inkscape:cx="146.18262"
+     inkscape:cy="605.21017"
+     inkscape:window-width="1920"
+     inkscape:window-height="1022"
+     inkscape:window-x="0"
+     inkscape:window-y="30"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg11"
+     showgrid="false" />
+  <!-- Background -->
+  <!-- Stopwatch crown -->
+  <rect
+     x="454"
+     y="78"
+     width="116"
+     height="86"
+     rx="26"
+     fill="#22c55e"
+     id="rect2"
+     style="fill:#747474;fill-opacity:1"
+     inkscape:label="stop2" />
+  <rect
+     x="685"
+     y="-318"
+     width="116"
+     height="86"
+     rx="26"
+     fill="#22c55e"
+     id="rect2-2"
+     transform="rotate(35)"
+     style="fill:#747474;fill-opacity:1"
+     inkscape:label="stop1" />
+  <!-- Stopwatch body ring -->
+  <circle
+     cx="512"
+     cy="572"
+     r="370"
+     fill="#262220"
+     id="circle2" />
+  <circle
+     cx="512"
+     cy="572"
+     r="370"
+     fill="none"
+     stroke="#22c55e"
+     stroke-width="42"
+     id="circle3"
+     style="stroke:#747474;stroke-opacity:1" />
+  <!-- Subtle inner ring -->
+  <circle
+     cx="512"
+     cy="572"
+     r="318"
+     fill="none"
+     stroke="#22c55e"
+     stroke-width="4"
+     opacity="0.2"
+     id="circle4" />
+  <!-- Tick marks (12, 3, 6, 9) -->
+  <rect
+     x="498"
+     y="234"
+     width="28"
+     height="60"
+     rx="8"
+     fill="#22c55e"
+     opacity="0.45"
+     id="rect4" />
+  <rect
+     x="498"
+     y="850"
+     width="28"
+     height="60"
+     rx="8"
+     fill="#22c55e"
+     opacity="0.45"
+     id="rect5" />
+  <rect
+     x="182"
+     y="558"
+     width="60"
+     height="28"
+     rx="8"
+     fill="#22c55e"
+     opacity="0.45"
+     id="rect6" />
+  <circle
+     style="fill:#ff8c00;fill-opacity:1;stroke-width:14;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;paint-order:markers fill stroke"
+     id="path1"
+     cx="512"
+     cy="401"
+     r="98"
+     inkscape:label="sun" />
+  <rect
+     x="782"
+     y="558"
+     width="60"
+     height="28"
+     rx="8"
+     fill="#22c55e"
+     opacity="0.45"
+     id="rect7" />
+  <!-- Mountain silhouette (clipped inside clock) -->
+  <clipPath
+     id="clock">
+    <circle
+       cx="512"
+       cy="572"
+       r="326"
+       id="circle7" />
+  </clipPath>
+  <g
+     clip-path="url(#clock)"
+     id="g8"
+     inkscape:label="bg1">
+    <!-- Mountain fill -->
+    <path
+       d="M 92,997 360,510 511,572 671,340 732,526 940,1006 Z"
+       fill="#22c55e"
+       opacity="0.1"
+       id="path7"
+       sodipodi:nodetypes="ccccccc"
+       inkscape:label="bgmountain" />
+    <!-- Mountain outline -->
+    <path
+       d="M 170,860 360,490 511,572 670,312 733,503 854,860"
+       fill="none"
+       stroke="#ffffff"
+       stroke-width="26"
+       stroke-linejoin="round"
+       stroke-linecap="round"
+       id="path8"
+       sodipodi:nodetypes="cccccc"
+       inkscape:label="mountain" />
+    <!-- Summit dot -->
+  </g>
+  <line
+     x1="668"
+     y1="313"
+     x2="474"
+     y2="635"
+     stroke="#22c55e"
+     stroke-width="22.9658"
+     stroke-linecap="round"
+     id="line11"
+     style="stroke:#101010;stroke-width:12;stroke-linecap:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:markers fill stroke"
+     inkscape:label="hand" />
+  <!-- Hour hand (~10 o'clock position) -->
+  <!-- Minute hand (~12 o'clock position) -->
+  <!-- Second hand (green, ~2 o'clock) -->
+  <!-- Center hub -->
+  <circle
+     cx="512"
+     cy="572"
+     r="21"
+     fill="#22c55e"
+     id="circle10"
+     style="fill:#101010;fill-opacity:1;stroke-width:1"
+     inkscape:label="centralPin" />
+</svg>
