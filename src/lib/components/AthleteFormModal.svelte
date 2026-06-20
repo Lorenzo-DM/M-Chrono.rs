@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { Athlete } from '../types';
   import { api } from '../api';
   import { courses } from '../stores';
@@ -11,13 +12,13 @@
 
   const NEW_COURSE = '__new__';
 
-  let bib = $state(athlete ? String(athlete.bib_number) : '');
-  let firstName = $state(athlete?.first_name ?? '');
-  let lastName = $state(athlete?.last_name ?? '');
-  let category = $state(athlete?.category ?? '');
+  let bib = $state(untrack(() => athlete ? String(athlete.bib_number) : ''));
+  let firstName = $state(untrack(() => athlete?.first_name ?? ''));
+  let lastName = $state(untrack(() => athlete?.last_name ?? ''));
+  let category = $state(untrack(() => athlete?.category ?? ''));
   let courseSel = $state<string>(
-    athlete ? String(athlete.course_id)
-            : ($courses[0] ? String($courses[0].id) : NEW_COURSE)
+    untrack(() => athlete ? String(athlete.course_id)
+                          : ($courses[0] ? String($courses[0].id) : NEW_COURSE))
   );
   let newCourseName = $state('');
   let error = $state<string | null>(null);

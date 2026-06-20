@@ -1,10 +1,18 @@
 <script lang="ts">
   import { breakpoint } from '../breakpoint';
   import { courses, layoutMode, activeCourseId, visibleLanes } from '../stores';
+  import { normalizeVisibleLanes, toggleLane } from '../splitLanes';
   import LaneCard from './LaneCard.svelte';
   import type { Course } from '../types';
 
   let effectiveLayout = $derived.by(() => ($breakpoint === 'mobile' ? 'tabs' : $layoutMode));
+
+  // Single source of truth for which lanes split mode shows.
+  let visibleLaneIds = $derived.by<number[]>(() =>
+    effectiveLayout === 'split'
+      ? normalizeVisibleLanes($courses.map(c => c.id), $visibleLanes)
+      : []
+  );
 
   // Pick which courses to show based on layout mode
   let visibleCourses = $derived.by<Course[]>(() => {
@@ -16,12 +24,9 @@
     }
     if (effectiveLayout === 'grid') return all;
     // split
-    const chosen = $visibleLanes
+    return visibleLaneIds
       .map(id => all.find(c => c.id === id))
       .filter(Boolean) as Course[];
-    if (chosen.length >= 2) return chosen.slice(0, 4);
-    // default: first 2 courses
-    return all.slice(0, Math.min(2, all.length));
   });
 
   // Ensure activeCourseId is set
@@ -31,10 +36,21 @@
     }
   });
 
+  // Persist the normalized selection so the picker, the grid and a reload agree.
+  $effect(() => {
+    if (effectiveLayout !== 'split' || $courses.length === 0) return;
+    const norm = visibleLaneIds;
+    const cur = $visibleLanes;
+    if (norm.length !== cur.length || norm.some((id, i) => id !== cur[i])) {
+      visibleLanes.set(norm);
+    }
+  });
+
   function gridClass() {
     if (effectiveLayout === 'tabs') return 'grid-cols-1';
     if (effectiveLayout === 'split') {
       const n = visibleCourses.length;
+      if (n <= 1) return 'grid-cols-1';
       return n >= 3 ? 'grid-cols-3' : 'grid-cols-2';
     }
     // grid
@@ -46,12 +62,7 @@
 
   function toggleSplitCourse(courseId: number) {
     if (effectiveLayout !== 'split') return;
-    visibleLanes.update(arr => {
-      if (arr.includes(courseId)) {
-        return arr.filter(id => id !== courseId);
-      }
-      return [...arr, courseId].slice(-4); // max 4
-    });
+    visibleLanes.set(toggleLane(visibleLaneIds, courseId));
   }
 </script>
 
@@ -78,7 +89,7 @@
     <div class="flex items-center gap-2 px-4 py-2 border-b" style="border-color: var(--line-2)">
       <div class="hud">CORSIE VISIBILI</div>
       {#each $courses as c (c.id)}
-        {@const on = (visibleCourses).some(v => v.id === c.id)}
+        {@const on = visibleLaneIds.includes(c.id)}
         <button
           class="lane-status"
           style="color: {on ? 'var(--accent-running)' : 'var(--fg-3)'}; cursor: pointer"

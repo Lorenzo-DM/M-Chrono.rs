@@ -358,7 +358,7 @@
         style={ended ? 'background: var(--accent-finish)' : ''}
       ></span>
       <span
-        class="lane-status"
+        class="lane-status header-status"
         style="color: {ended
           ? 'var(--accent-finish)'
           : started
@@ -402,15 +402,15 @@
 
   <!-- Timer -->
   <div
-    class="bg-[var(--bg-0)] border-b flex items-center justify-center shrink-0"
+    class="timer-wrap bg-[var(--bg-0)] border-b flex items-center justify-center shrink-0"
     style="border-color: var(--line-2); padding: {size === 'full' ? '2rem 1rem' : '1.25rem 1rem'}"
   >
     <div
       class="chronodial num"
       data-state={started ? 'running' : 'idle'}
       style="font-size: {size === 'full'
-        ? 'clamp(3.5rem, 9vw, 7rem)'
-        : 'clamp(2.5rem, 5vw, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
+        ? 'clamp(2rem, 18cqi, 7rem)'
+        : 'clamp(1.5rem, 18cqi, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
     >
       {formatMsToHms(elapsed)}
     </div>
@@ -649,6 +649,7 @@
                   class="row-main"
                   onsubmit={(e) => { e.preventDefault(); doSaveAthleteName(r.f.athlete); }}
                 >
+                  <!-- svelte-ignore a11y_autofocus -->
                   <input
                     type="text"
                     class="bib-input"
@@ -773,6 +774,24 @@
 <style>
   .lane-card {
     overflow: hidden;
+    container-type: inline-size;
+  }
+  /* In a very narrow column the colored dot + action button already convey
+     state; drop the redundant status word so the header stops crowding. */
+  @container (max-width: 300px) {
+    .header-status {
+      display: none;
+    }
+  }
+  /* Timer scales to the column width (cqi), not the viewport, so it never
+     overflows or clips in a narrow split column / small window. */
+  .timer-wrap {
+    container-type: inline-size;
+    overflow: hidden;
+  }
+  .chronodial {
+    white-space: nowrap;
+    max-width: 100%;
   }
   .rows-list {
     container-type: inline-size;
