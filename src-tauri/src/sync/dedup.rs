@@ -69,11 +69,11 @@ mod tests {
         let repo = Arc::new(Repo::new(db.conn.clone()));
         repo.upsert_course(&Course {
             id: 1, name: "x".into(), distance_m: None,
-            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
         }).unwrap();
         repo.upsert_athlete(&Athlete {
             id: 1, bib_number: 1, first_name: "a".into(),
-            last_name: "b".into(), course_id: 1,
+            last_name: "b".into(), course_id: 1, category: None, anonymous: false,
         }).unwrap();
         repo
     }

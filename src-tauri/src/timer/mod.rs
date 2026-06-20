@@ -139,9 +139,20 @@ pub async fn assign_pending(
         .ok_or_else(|| AppError::NotFound(format!("pending {}", pending_id)))?;
     let athlete = s.athletes_by_bib.get(&bib).cloned()
         .ok_or_else(|| AppError::NotFound(format!("bib {}", bib)))?;
-    let timing = repo.find_running_timing_for_athlete(athlete.id, operator_id)?
-        .ok_or_else(|| AppError::InvalidState(
-            format!("no running timing for athlete {}", athlete.id)))?;
+    let timing = match repo.find_running_timing_for_athlete(athlete.id, operator_id)? {
+        Some(t) => t,
+        None => {
+            // athlete registered after race start — create timing retroactively
+            let start_ms = s.courses.get(&pending.course_id)
+                .and_then(|c| c.started_at_ms)
+                .ok_or_else(|| AppError::InvalidState("course not started".into()))?;
+            let tid = repo.insert_timing_running(athlete.id, pending.course_id, start_ms, operator_id)?;
+            let t = repo.get_timing(tid)?.ok_or_else(|| AppError::NotFound("timing".into()))?;
+            s.timings_by_athlete.entry(athlete.id).or_default().push(t.id);
+            s.timings.insert(t.id, t.clone());
+            t
+        }
+    };
     let start = timing.start_timestamp_ms.ok_or_else(||
         AppError::InvalidState("timing has no start".into()))?;
     let total = pending.finish_timestamp_ms - start;
@@ -170,6 +181,40 @@ pub async fn withdraw_athlete(
     Ok(())
 }
 
+/// Set a running athlete's timing to Withdrawn or DNS (Did Not Start).
+pub async fn set_timing_status_by_athlete(
+    state: &SharedState,
+    repo: &Repo,
+    athlete_id: i64,
+    operator_id: &str,
+    status: TimingStatus,
+) -> AppResult<Timing> {
+    let mut s = state.write().await;
+    let timing = repo.find_running_timing_for_athlete(athlete_id, operator_id)?
+        .ok_or_else(|| AppError::InvalidState(
+            format!("nessun timing in corso per atleta {}", athlete_id)))?;
+    repo.update_status(timing.id, status)?;
+    let updated = repo.get_timing(timing.id)?.expect("updated");
+    s.timings.insert(updated.id, updated.clone());
+    Ok(updated)
+}
+
+/// Record an intermediate split for an athlete at a checkpoint (immediate,
+/// timestamped now).
+pub async fn record_split(
+    state: &SharedState,
+    repo: &Repo,
+    clock: &dyn ClockProvider,
+    athlete_id: i64,
+    checkpoint_id: i64,
+    course_id: i64,
+    operator_id: &str,
+) -> AppResult<crate::models::Split> {
+    let ts_ms = clock.now_ms();
+    let _guard = state.read().await; // serialize against concurrent state writers
+    repo.record_split(athlete_id, checkpoint_id, course_id, ts_ms, operator_id)
+}
+
 pub async fn undo_finish(
     state: &SharedState,
     repo: &Repo,
@@ -191,6 +236,20 @@ pub async fn delete_pending_finish(
     repo.delete_pending_finish(pending_id)?;
     s.pending.retain(|p| p.id != pending_id);
     Ok(())
+}
+
+pub async fn move_pending_to_course(
+    state: &SharedState,
+    repo: &Repo,
+    pending_id: i64,
+    target_course_id: i64,
+) -> AppResult<PendingFinish> {
+    let mut s = state.write().await;
+    repo.update_pending_course(pending_id, target_course_id)?;
+    let p = s.pending.iter_mut().find(|p| p.id == pending_id)
+        .ok_or_else(|| AppError::NotFound(format!("pending {}", pending_id)))?;
+    p.course_id = target_course_id;
+    Ok(p.clone())
 }
 
 pub async fn restart_course(
@@ -341,6 +400,22 @@ mod tests_pending {
     }
 
     #[tokio::test]
+    async fn move_pending_updates_course_and_returns_it() {
+        let (state, repo, clock) = setup().await;
+        repo.upsert_course(&crate::models::Course {
+            id: 2, name: "y".into(), distance_m: None,
+            started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None,
+        }).unwrap();
+        start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        clock.advance(4_000);
+        let p = capture_pending_finish(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
+        let moved = move_pending_to_course(&state, &repo, p.id, 2).await.unwrap();
+        assert_eq!(moved.course_id, 2);
+        let s = state.read().await;
+        assert_eq!(s.pending.iter().find(|x| x.id == p.id).unwrap().course_id, 2);
+    }
+
+    #[tokio::test]
     async fn withdraw_changes_status() {
         let (state, repo, clock) = setup().await;
         start_course(&state, &repo, &*clock, 1, "PC-A").await.unwrap();
@@ -378,10 +453,10 @@ mod tests {
         let clock = Arc::new(MockClock::new(1_000_000));
         let repo = Arc::new(Repo::with_clock(db.conn.clone(), clock.clone()));
         repo.upsert_course(&Course { id: 1, name: "x".into(), distance_m: None,
-                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None }).unwrap();
+                                      started_at_ms: None, scheduled_at_ms: None, ended_at_ms: None, race_id: None }).unwrap();
         for i in 1..=3 {
             repo.upsert_athlete(&Athlete {
-                id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1
+                id: i, bib_number: i, first_name: "a".into(), last_name: "b".into(), course_id: 1, category: None, anonymous: false,
             }).unwrap();
         }
         let state = new_shared();

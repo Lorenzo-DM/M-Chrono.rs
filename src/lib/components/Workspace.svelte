@@ -1,40 +1,55 @@
 <script lang="ts">
+  import { breakpoint } from '../breakpoint';
   import { courses, layoutMode, activeCourseId, visibleLanes } from '../stores';
+  import { normalizeVisibleLanes, toggleLane } from '../splitLanes';
   import LaneCard from './LaneCard.svelte';
   import type { Course } from '../types';
+  import { CircleDot, Circle } from 'lucide-svelte';
+  import { t } from '../i18n';
 
-  // Pick which courses to show based on layout mode
+  let effectiveLayout = $derived.by(() => ($breakpoint === 'mobile' ? 'tabs' : $layoutMode));
+
+  let visibleLaneIds = $derived.by<number[]>(() =>
+    effectiveLayout === 'split'
+      ? normalizeVisibleLanes($courses.map(c => c.id), $visibleLanes)
+      : []
+  );
+
   let visibleCourses = $derived.by<Course[]>(() => {
     const all = $courses;
     if (all.length === 0) return [];
-    if ($layoutMode === 'tabs') {
+    if (effectiveLayout === 'tabs') {
       const active = all.find(c => c.id === $activeCourseId) ?? all[0];
       return [active];
     }
-    if ($layoutMode === 'grid') return all;
-    // split
-    const chosen = $visibleLanes
+    if (effectiveLayout === 'grid') return all;
+    return visibleLaneIds
       .map(id => all.find(c => c.id === id))
       .filter(Boolean) as Course[];
-    if (chosen.length >= 2) return chosen.slice(0, 4);
-    // default: first 2 courses
-    return all.slice(0, Math.min(2, all.length));
   });
 
-  // Ensure activeCourseId is set
   $effect(() => {
     if (!$activeCourseId && $courses.length > 0) {
       activeCourseId.set($courses[0].id);
     }
   });
 
+  $effect(() => {
+    if (effectiveLayout !== 'split' || $courses.length === 0) return;
+    const norm = visibleLaneIds;
+    const cur = $visibleLanes;
+    if (norm.length !== cur.length || norm.some((id, i) => id !== cur[i])) {
+      visibleLanes.set(norm);
+    }
+  });
+
   function gridClass() {
-    if ($layoutMode === 'tabs') return 'grid-cols-1';
-    if ($layoutMode === 'split') {
+    if (effectiveLayout === 'tabs') return 'grid-cols-1';
+    if (effectiveLayout === 'split') {
       const n = visibleCourses.length;
+      if (n <= 1) return 'grid-cols-1';
       return n >= 3 ? 'grid-cols-3' : 'grid-cols-2';
     }
-    // grid
     const n = $courses.length;
     if (n <= 2) return 'grid-cols-2';
     if (n <= 4) return 'grid-cols-2 grid-rows-2';
@@ -42,19 +57,13 @@
   }
 
   function toggleSplitCourse(courseId: number) {
-    if ($layoutMode !== 'split') return;
-    visibleLanes.update(arr => {
-      if (arr.includes(courseId)) {
-        return arr.filter(id => id !== courseId);
-      }
-      return [...arr, courseId].slice(-4); // max 4
-    });
+    if (effectiveLayout !== 'split') return;
+    visibleLanes.set(toggleLane(visibleLaneIds, courseId));
   }
 </script>
 
 <div class="h-full flex flex-col">
-  <!-- Tab strip (tabs mode) or split-lane picker (split mode) -->
-  {#if $layoutMode === 'tabs'}
+  {#if effectiveLayout === 'tabs'}
     <div class="tab-strip overflow-x-auto">
       {#each $courses as c (c.id)}
         <button
@@ -63,38 +72,38 @@
           onclick={() => activeCourseId.set(c.id)}
         >
           <span class="num">{c.name}</span>
-          {#if c.started_at_ms}
+          {#if c.ended_at_ms}
+            <span class="dot-idle ml-2 inline-block" style="background: var(--accent-finish)"></span>
+          {:else if c.started_at_ms}
             <span class="dot-running ml-2 inline-block"></span>
           {/if}
         </button>
       {/each}
     </div>
-  {:else if $layoutMode === 'split'}
+  {:else if effectiveLayout === 'split'}
     <div class="flex items-center gap-2 px-4 py-2 border-b" style="border-color: var(--line-2)">
-      <div class="hud">CORSIE VISIBILI</div>
+      <div class="hud">{$t.workspace.visibleLanes}</div>
       {#each $courses as c (c.id)}
-        {@const on = (visibleCourses).some(v => v.id === c.id)}
+        {@const on = visibleLaneIds.includes(c.id)}
         <button
           class="lane-status"
           style="color: {on ? 'var(--accent-running)' : 'var(--fg-3)'}; cursor: pointer"
           onclick={() => toggleSplitCourse(c.id)}
         >
-          {on ? '●' : '○'} {c.name}
+          {#if on}<CircleDot size={12} />{:else}<Circle size={12} />{/if} {c.name}
         </button>
       {/each}
-      <div class="hud ml-auto" style="color: var(--fg-3)">max 4 corsie</div>
+      <div class="hud ml-auto" style="color: var(--fg-3)">{$t.workspace.maxLanes}</div>
     </div>
   {/if}
 
-  <!-- Lane grid -->
   <div class="flex-1 p-3 min-h-0">
     {#if visibleCourses.length === 0}
       <div class="h-full flex items-center justify-center">
         <div class="text-center">
-          <div class="hud-strong text-lg mb-3" style="color: var(--fg-2)">NESSUN PERCORSO</div>
+          <div class="hud-strong text-lg mb-3" style="color: var(--fg-2)">{$t.workspace.noCourses}</div>
           <div class="text-sm" style="color: var(--fg-3)">
-            Configura l'operator_id in <span class="kbd">SETTINGS</span> e premi
-            <span class="kbd">SINCRONIZZA</span>
+            {$t.workspace.addCourseHint}
           </div>
         </div>
       </div>

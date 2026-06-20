@@ -1,0 +1,113 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { api } from '../api';
+  import { courses } from '../stores';
+  import type { Checkpoint } from '../types';
+  import Button from '../ui/Button.svelte';
+  import { TriangleAlert, X } from 'lucide-svelte';
+  import { t } from '../i18n';
+
+  let checkpoints = $state<Checkpoint[]>([]);
+  let selectedCourseId = $state<number | null>(null);
+  let newName = $state('');
+  let error = $state<string | null>(null);
+  let busy = $state(false);
+
+  $effect(() => {
+    if (selectedCourseId == null) selectedCourseId = $courses[0]?.id ?? null;
+  });
+
+  onMount(load);
+
+  async function load() {
+    try {
+      checkpoints = await api.getCheckpoints();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
+  let courseCheckpoints = $derived(
+    checkpoints
+      .filter((c) => c.course_id === selectedCourseId)
+      .sort((a, b) => a.position - b.position),
+  );
+
+  async function add() {
+    error = null;
+    if (selectedCourseId == null) { error = $t.checkpoints.errorCourseRequired; return; }
+    if (!newName.trim()) { error = $t.checkpoints.errorNameRequired; return; }
+    busy = true;
+    try {
+      const position = courseCheckpoints.length + 1;
+      await api.saveCheckpoint(null, {
+        course_id: selectedCourseId,
+        name: newName.trim(),
+        position,
+      });
+      newName = '';
+      await load();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    } finally { busy = false; }
+  }
+
+  async function remove(id: number) {
+    error = null;
+    try {
+      await api.deleteCheckpoint(id);
+      await load();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+</script>
+
+<div class="flex flex-col gap-3">
+  <p class="text-sm" style="color: var(--fg-2)">
+    {$t.checkpoints.description}
+  </p>
+
+  <div class="flex items-end gap-2">
+    <label class="flex flex-col gap-1">
+      <span class="hud">{$t.checkpoints.courseLabel}</span>
+      <select bind:value={selectedCourseId}>
+        {#each $courses as c (c.id)}
+          <option value={c.id}>{c.name}</option>
+        {/each}
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 flex-1 max-w-xs">
+      <span class="hud">{$t.checkpoints.newCheckpointLabel}</span>
+      <input
+        bind:value={newName}
+        placeholder={$t.checkpoints.newCheckpointPlaceholder}
+        autocomplete="off"
+        onkeydown={(e) => e.key === 'Enter' && add()}
+      />
+    </label>
+    <Button variant="primary" disabled={busy} onclick={add}>{$t.checkpoints.addButton}</Button>
+  </div>
+
+  {#if courseCheckpoints.length > 0}
+    <ul class="flex flex-col gap-1">
+      {#each courseCheckpoints as cp (cp.id)}
+        <li class="flex items-center justify-between px-3 py-2 rounded"
+            style="background: var(--bg-2)">
+          <span style="color: var(--fg-0)">
+            <span class="num" style="color: var(--fg-3)">{cp.position}.</span> {cp.name}
+          </span>
+          <Button variant="ghost" size="sm" onclick={() => remove(cp.id)} title={$t.checkpoints.removeTitle}>
+            <X size={14} />
+          </Button>
+        </li>
+      {/each}
+    </ul>
+  {:else}
+    <div class="hud" style="color: var(--fg-3)">{$t.checkpoints.noCheckpoints}</div>
+  {/if}
+
+  {#if error}
+    <div class="hud" style="color: var(--accent-finish)"><TriangleAlert size={14} /> {error}</div>
+  {/if}
+</div>

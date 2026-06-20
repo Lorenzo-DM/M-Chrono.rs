@@ -3,8 +3,15 @@
   import { api } from '../api';
   import { on } from '../events';
   import { formatMsToHms } from '../format';
-  import type { Course, PendingFinish, AthleteRow } from '../types';
+  import { courses, courseSnapshots, allAthletes, checkpoints } from '../stores';
+  import { beep } from '../sound';
+  import type { Course, PendingFinish, AthleteRow, Athlete } from '../types';
   import ConfirmRaceModal from './ConfirmRaceModal.svelte';
+  import ConfirmModal from './ConfirmModal.svelte';
+  import Button from '../ui/Button.svelte';
+  import BibCombobox from './BibCombobox.svelte';
+  import { Play, Flag, Check, X, ArrowLeftRight, Undo2 } from 'lucide-svelte';
+  import { t, i } from '../i18n';
 
   let {
     course,
@@ -18,43 +25,57 @@
     onFocus?: () => void;
   }>();
 
-  let elapsed = $state(0);
-  let started = $state(false);
-  let ended = $state(false);
   let pending = $state<PendingFinish[]>([]);
   let finishers = $state<AthleteRow[]>([]);
   let flashing = $state(false);
   let busy = $state(false);
   let error = $state<string | null>(null);
-  let bibInputs = $state<Record<number, string>>({});
+  let selectedAthletes = $state<Record<number, Athlete | null>>({});
   let showEndModal = $state(false);
   let showRestartModal = $state(false);
+  let confirmState = $state<{ message: string; onConfirm: () => void } | null>(null);
   let editingTimingId = $state<number | null>(null);
   let editBibInput = $state('');
+  let movingPendingId = $state<number | null>(null);
+  let editingAthleteId = $state<number | null>(null);
+  let editAthleteFirst = $state('');
+  let editAthleteLast = $state('');
 
+  // Live timer/state come from the single shared display poll (see stores.ts).
+  let snap = $derived($courseSnapshots[course.id]);
+  let elapsed = $derived(snap?.elapsed_ms ?? 0);
+  let started = $derived(snap?.started ?? false);
+  let ended = $derived(snap?.ended ?? false);
+
+  // Athlete roster for this course comes from the shared store.
+  let courseAthletes = $derived($allAthletes.filter((a) => a.course_id === course.id));
+
+  // Checkpoints for this course (intermediate split capture).
+  let courseCheckpoints = $derived(
+    $checkpoints
+      .filter((c) => c.course_id === course.id)
+      .sort((a, b) => a.position - b.position),
+  );
+  let splitCheckpointId = $state<number | null>(null);
   $effect(() => {
-    let alive = true;
-    const tick = async () => {
-      if (!alive) return;
-      try {
-        const snap = await api.pollDisplay();
-        const c = snap.courses.find((x) => x.id === course.id);
-        if (c) {
-          elapsed = c.elapsed_ms ?? 0;
-          started = c.started;
-          ended = c.ended;
-        }
-      } catch {
-        // transient
-      }
-    };
-    tick();
-    const id = window.setInterval(tick, 100);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
+    if (splitCheckpointId == null && courseCheckpoints.length > 0) {
+      splitCheckpointId = courseCheckpoints[0].id;
+    }
   });
+
+  async function doRecordSplit(bib: number) {
+    if (splitCheckpointId == null) return;
+    error = null;
+    try {
+      await api.recordSplit(splitCheckpointId, bib);
+      beep('capture');
+      flashing = true;
+      setTimeout(() => (flashing = false), 400);
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+      beep('error');
+    }
+  }
 
   async function refresh() {
     try {
@@ -98,10 +119,12 @@
     try {
       const p = await api.capturePending(course.id);
       pending = [p, ...pending];
+      beep('capture');
       flashing = true;
       setTimeout(() => (flashing = false), 600);
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
@@ -111,56 +134,98 @@
     try {
       const p = await api.capturePendingTie(course.id);
       pending = [p, ...pending];
+      beep('capture');
       flashing = true;
       setTimeout(() => (flashing = false), 600);
     } catch (e: any) {
       error = e?.message ?? String(e);
+      beep('error');
     }
   }
 
   async function doAssign(pid: number) {
     error = null;
-    const raw = (bibInputs[pid] ?? '').trim();
-    const n = parseInt(raw);
-    if (!Number.isFinite(n) || n <= 0) {
-      error = 'pettorale non valido';
-      return;
-    }
+    const athlete = selectedAthletes[pid];
+    if (!athlete) { error = $t.lane.errorSelectAthlete; return; }
     try {
-      await api.assignPending(pid, n);
-      const next = { ...bibInputs };
+      await api.assignPending(pid, athlete.bib_number);
+      const next = { ...selectedAthletes };
       delete next[pid];
-      bibInputs = next;
+      selectedAthletes = next;
+      beep('assign');
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+      beep('error');
+    }
+  }
+
+  async function doMovePending(pid: number, targetCourseId: number) {
+    movingPendingId = null;
+    error = null;
+    try {
+      await api.movePendingToCourse(pid, targetCourseId);
       await refresh();
     } catch (e: any) {
       error = e?.message ?? String(e);
     }
   }
 
-  async function doDeletePending(pid: number, tsMs: number) {
+  async function doFreeEntryAssign(pid: number, bib: number) {
+    error = null;
+    try {
+      await api.saveAthlete(null, {
+        bib_number: bib,
+        first_name: '',
+        last_name: '',
+        course_id: course.id,
+        course_name: null,
+        anonymous: true,
+      });
+      await api.assignPending(pid, bib);
+      const next = { ...selectedAthletes };
+      delete next[pid];
+      selectedAthletes = next;
+      beep('assign');
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+      beep('error');
+    }
+  }
+
+  function doDeletePending(pid: number, tsMs: number) {
     const label = formatMsToHms(tsMs % 86_400_000);
-    if (!window.confirm(`Eliminare il tempo ${label}? Operazione irreversibile.`)) return;
-    error = null;
-    try {
-      await api.deletePendingFinish(pid);
-      const next = { ...bibInputs };
-      delete next[pid];
-      bibInputs = next;
-      await refresh();
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-    }
+    confirmState = {
+      message: i($t.lane.confirmDeleteTime, { label }),
+      onConfirm: async () => {
+        error = null;
+        try {
+          await api.deletePendingFinish(pid);
+          const next = { ...selectedAthletes };
+          delete next[pid];
+          selectedAthletes = next;
+          await refresh();
+        } catch (e: any) {
+          error = e?.message ?? String(e);
+        }
+      },
+    };
   }
 
-  async function doUndoFinish(timingId: number, bib: number) {
-    if (!window.confirm(`Annullare l'arrivo del pettorale #${bib}? L'atleta torna in gara.`)) return;
-    error = null;
-    try {
-      await api.undoFinish(timingId);
-      await refresh();
-    } catch (e: any) {
-      error = e?.message ?? String(e);
-    }
+  function doUndoFinish(timingId: number, bib: number) {
+    confirmState = {
+      message: i($t.lane.confirmUndoFinish, { bib }),
+      onConfirm: async () => {
+        error = null;
+        try {
+          await api.undoFinish(timingId);
+          await refresh();
+        } catch (e: any) {
+          error = e?.message ?? String(e);
+        }
+      },
+    };
   }
 
   function startEditBib(timingId: number, currentBib: number) {
@@ -174,10 +239,50 @@
     editBibInput = '';
   }
 
+  function isAnonymous(a: Athlete): boolean {
+    return a.anonymous;
+  }
+
+  function startEditAthleteName(a: Athlete) {
+    editingAthleteId = a.id;
+    editAthleteFirst = isAnonymous(a) ? '' : a.first_name;
+    editAthleteLast = a.last_name;
+    editingTimingId = null;
+    error = null;
+  }
+
+  function cancelEditAthleteName() {
+    editingAthleteId = null;
+    editAthleteFirst = '';
+    editAthleteLast = '';
+  }
+
+  async function doSaveAthleteName(a: Athlete) {
+    const first = editAthleteFirst.trim();
+    const last = editAthleteLast.trim();
+    if (!first && !last) { error = $t.lane.errorNameRequired; return; }
+    error = null;
+    try {
+      await api.saveAthlete(a.id, {
+        bib_number: a.bib_number,
+        first_name: first,
+        last_name: last,
+        course_id: a.course_id,
+        course_name: null,
+        category: a.category,
+        anonymous: false,
+      });
+      cancelEditAthleteName();
+      await refresh();
+    } catch (e: any) {
+      error = e?.message ?? String(e);
+    }
+  }
+
   async function commitEditBib(timingId: number) {
     const n = parseInt(editBibInput.trim());
     if (!Number.isFinite(n) || n <= 0) {
-      error = 'pettorale non valido';
+      error = $t.lane.errorInvalidBib;
       return;
     }
     error = null;
@@ -255,57 +360,59 @@
         style={ended ? 'background: var(--accent-finish)' : ''}
       ></span>
       <span
-        class="lane-status"
+        class="lane-status header-status"
         style="color: {ended
           ? 'var(--accent-finish)'
           : started
             ? 'var(--accent-running)'
             : 'var(--fg-3)'}"
       >
-        {ended ? 'TERMINATA' : started ? 'ACTIVE' : 'STANDBY'}
+        {ended ? $t.lane.statusEnded : started ? $t.lane.statusActive : $t.lane.statusStandby}
       </span>
 
       {#if started && !ended}
-        <button
-          class="btn-header-end"
-          title="Termina gara"
-          aria-label="Termina gara"
+        <Button
+          variant="finish"
+          size="sm"
+          title={$t.lane.endCourseTitle}
+          ariaLabel={$t.lane.endCourseTitle}
           onclick={(e) => {
             e.stopPropagation();
             showEndModal = true;
           }}
         >
-          ■ TERMINA
-        </button>
+          <Flag size={14} /> {$t.lane.endLabel}
+        </Button>
       {/if}
 
       {#if ended}
-        <button
-          class="btn-header-restart"
-          title="Riavvia gara (azzera timer)"
-          aria-label="Riavvia gara"
+        <Button
+          variant="tap"
+          size="sm"
+          title={$t.lane.restartCourseTitle}
+          ariaLabel={$t.lane.restartCourseTitle}
           onclick={(e) => {
             e.stopPropagation();
             showRestartModal = true;
           }}
         >
-          ↻ RIAVVIA
-        </button>
+          {$t.lane.restartLabel}
+        </Button>
       {/if}
     </div>
   </header>
 
   <!-- Timer -->
   <div
-    class="bg-[var(--bg-0)] border-b flex items-center justify-center shrink-0"
+    class="timer-wrap bg-[var(--bg-0)] border-b flex items-center justify-center shrink-0"
     style="border-color: var(--line-2); padding: {size === 'full' ? '2rem 1rem' : '1.25rem 1rem'}"
   >
     <div
       class="chronodial num"
       data-state={started ? 'running' : 'idle'}
       style="font-size: {size === 'full'
-        ? 'clamp(3.5rem, 9vw, 7rem)'
-        : 'clamp(2.5rem, 5vw, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
+        ? 'clamp(0.85rem, 12cqi, 7rem)'
+        : 'clamp(0.7rem, 12cqi, 4rem)'}; font-weight: 700; letter-spacing: -0.025em"
     >
       {formatMsToHms(elapsed)}
     </div>
@@ -314,30 +421,32 @@
   <!-- Action -->
   <div class="p-3 shrink-0 border-b" style="border-color: var(--line-2)">
     {#if !started}
-      <button
-        class="btn-base btn-accent-start w-full text-base font-semibold"
+      <Button
+        variant="start"
+        class="w-full text-base font-semibold"
         style="padding: 1rem 1rem"
         disabled={busy}
         onclick={doStart}
       >
-        ▶ START PERCORSO
-      </button>
+        <Play size={16} /> {$t.lane.startCourse}
+      </Button>
     {:else if ended}
-      <button
-        class="btn-base w-full text-base"
+      <Button
+        class="w-full text-base"
         style="padding: 1rem 1rem; color: var(--fg-3); cursor: default"
         disabled
       >
-        ■ GARA TERMINATA
-      </button>
+        <Flag size={16} /> {$t.lane.courseEnded}
+      </Button>
     {:else}
       <div class="flex gap-2">
-        <button
-          class="btn-base btn-accent-tap flex-1 text-base font-semibold"
+        <Button
+          variant="tap"
+          class="flex-1 text-base font-semibold"
           style="padding: 1rem 1rem; letter-spacing: 0.06em"
           onclick={doRecord}
         >
-          RECORD TIME
+          {$t.lane.recordTime}
           {#if active}
             <span
               class="kbd ml-2"
@@ -345,22 +454,42 @@
               >␣</span
             >
           {/if}
-        </button>
+        </Button>
         <button
           class="btn-tie"
           title={pending.length > 0
-            ? `Aggiunge un atleta con lo stesso tempo dell'ultimo arrivo (${formatMsToHms(pending[0].finish_timestamp_ms % 86_400_000)})`
-            : 'Disponibile dopo il primo RECORD'}
+            ? `+1 ${$t.lane.sameTime} (${formatMsToHms(pending[0].finish_timestamp_ms % 86_400_000)})`
+            : `${$t.lane.sameTime} — ${$t.common.comingSoon}`}
           aria-label="Cattura tempo identico"
           disabled={pending.length === 0}
           onclick={doTie}
         >
           <span class="num text-base font-bold">+1</span>
-          <span class="tie-label">STESSO TEMPO</span>
+          <span class="tie-label">{$t.lane.sameTime}</span>
         </button>
       </div>
     {/if}
   </div>
+
+  <!-- Checkpoint split capture -->
+  {#if started && !ended && courseCheckpoints.length > 0}
+    <div class="px-3 py-2 border-b flex items-center gap-2" style="border-color: var(--line-2); background: var(--bg-1)">
+      <span class="hud" style="color: var(--fg-3)">{$t.lane.splitLabel}</span>
+      <select bind:value={splitCheckpointId} class="text-sm" style="max-width: 9rem">
+        {#each courseCheckpoints as cp (cp.id)}
+          <option value={cp.id}>{cp.name}</option>
+        {/each}
+      </select>
+      <div class="flex-1 min-w-0">
+        <BibCombobox
+          athletes={courseAthletes}
+          compact
+          placeholder={$t.lane.splitPlaceholder}
+          onSelect={(a) => a && doRecordSplit(a.bib_number)}
+        />
+      </div>
+    </div>
+  {/if}
 
   <!-- Mixed history list -->
   <div class="flex-1 min-h-0 flex flex-col">
@@ -368,7 +497,7 @@
       class="flex items-center justify-between px-3 py-2 border-b shrink-0"
       style="border-color: var(--line-1); background: var(--bg-1)"
     >
-      <div class="hud">ARRIVI / DA ASSEGNARE</div>
+      <div class="hud">{$t.lane.historyHeader}</div>
       <div class="hud">
         <span style="color: var(--accent-pending)">{pendingCount}</span>
         <span style="color: var(--fg-3)"> / {finishers.length}</span>
@@ -378,77 +507,119 @@
     {#if rows.length === 0}
       <div class="flex-1 flex items-center justify-center px-4 py-8">
         <div class="text-center">
-          <div class="hud mb-1" style="color: var(--fg-3)">NESSUN ARRIVO</div>
+          <div class="hud mb-1" style="color: var(--fg-3)">{$t.lane.noFinishes}</div>
           <div class="text-xs" style="color: var(--fg-3)">
             {#if started}
-              Premi <span class="kbd">RECORD</span>
-              {#if active}o <span class="kbd">␣</span>{/if}
-              per catturare un tempo
+              {$t.lane.pressRecord}
             {:else}
-              Avvia il percorso per iniziare a cronometrare
+              {$t.lane.startFirst}
             {/if}
           </div>
         </div>
       </div>
     {:else}
-      <ul class="flex-1 overflow-auto">
+      <ul class="flex-1 overflow-auto rows-list">
         {#each rows as r (r.kind === 'pending' ? `p-${r.p.id}` : `f-${r.f.athlete.id}`)}
           {#if r.kind === 'pending'}
             <li class="row row-pending slide-in">
               <span class="pos-chip">{r.pos}</span>
-              <span class="row-time num">
-                {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+              <span class="row-time-col">
+                {#if course.started_at_ms}
+                  <span class="num row-time">
+                    {formatMsToHms(r.p.finish_timestamp_ms - course.started_at_ms)}
+                  </span>
+                {:else}
+                  <span class="num row-time">
+                    {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+                  </span>
+                {/if}
+                <span class="num row-elapsed">
+                  {formatMsToHms(r.p.finish_timestamp_ms % 86_400_000)}
+                </span>
               </span>
-              <form
-                class="row-main"
-                onsubmit={(e) => {
-                  e.preventDefault();
-                  doAssign(r.p.id);
-                }}
-              >
-                <input
-                  type="number"
-                  inputmode="numeric"
-                  placeholder="BIB"
-                  class="bib-input num"
-                  value={bibInputs[r.p.id] ?? ''}
-                  oninput={(e) =>
-                    (bibInputs = {
-                      ...bibInputs,
-                      [r.p.id]: (e.currentTarget as HTMLInputElement).value,
-                    })}
-                />
-                <span class="row-hint">da assegnare</span>
-                <button
-                  type="submit"
-                  class="btn-row btn-row-confirm"
-                  title="Assegna pettorale"
-                  aria-label="Assegna pettorale"
-                >
-                  ✓
-                </button>
-                <button
-                  type="button"
-                  class="btn-row btn-row-danger"
-                  title="Elimina tempo"
-                  aria-label="Elimina tempo"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    doDeletePending(r.p.id, r.p.finish_timestamp_ms);
+              {#if movingPendingId === r.p.id}
+                <div class="row-main">
+                  <span class="row-hint">{$t.lane.moveToLabel}</span>
+                  {#each $courses.filter(c => c.id !== course.id) as c (c.id)}
+                    <button
+                      type="button"
+                      class="btn-row btn-row-move"
+                      onclick={() => doMovePending(r.p.id, c.id)}
+                    >{c.name}</button>
+                  {/each}
+                  <button
+                    type="button"
+                    class="btn-row"
+                    onclick={() => (movingPendingId = null)}
+                    title={$t.common.cancel}
+                  ><X size={14} /></button>
+                </div>
+              {:else}
+                <form
+                  class="row-main"
+                  onsubmit={(e) => {
+                    e.preventDefault();
+                    doAssign(r.p.id);
                   }}
                 >
-                  ✕
-                </button>
-              </form>
+                  <BibCombobox
+                    athletes={courseAthletes}
+                    compact
+                    placeholder="# o nome"
+                    onSelect={(a) => {
+                      selectedAthletes = { ...selectedAthletes, [r.p.id]: a };
+                    }}
+                    onFreeEntry={(bib) => doFreeEntryAssign(r.p.id, bib)}
+                  />
+                  <button
+                    type="submit"
+                    class="btn-row btn-row-confirm"
+                    disabled={!selectedAthletes[r.p.id]}
+                    title={$t.modals.assignBib.confirmLabel}
+                    aria-label={$t.modals.assignBib.confirmLabel}
+                  >
+                    <Check size={14} />
+                  </button>
+                  {#if $courses.length > 1}
+                    <button
+                      type="button"
+                      class="btn-row"
+                      title={$t.lane.moveToLabel}
+                      aria-label={$t.lane.moveToLabel}
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        movingPendingId = r.p.id;
+                      }}
+                    ><ArrowLeftRight size={14} /></button>
+                  {/if}
+                  <button
+                    type="button"
+                    class="btn-row btn-row-danger"
+                    title={$t.common.delete}
+                    aria-label={$t.common.delete}
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      doDeletePending(r.p.id, r.p.finish_timestamp_ms);
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </form>
+              {/if}
             </li>
           {:else}
-            {@const isEditing = editingTimingId === r.f.timing_id && r.f.timing_id != null}
-            <li class="row row-finish">
+            {@const isEditingBib = editingTimingId === r.f.timing_id && r.f.timing_id != null}
+            {@const isEditingName = editingAthleteId === r.f.athlete.id}
+            {@const anon = isAnonymous(r.f.athlete)}
+            <li class="row row-finish" class:row-anon={anon}>
               <span class="pos-chip pos-chip-done">{r.pos}</span>
-              <span class="row-time num">
-                {formatMsToHms(r.f.total_ms ?? 0)}
+              <span class="row-time-col">
+                <span class="num row-time">{formatMsToHms(r.f.total_ms ?? 0)}</span>
+                {#if r.f.finish_ms}
+                  <span class="num row-elapsed">{formatMsToHms(r.f.finish_ms % 86_400_000)}</span>
+                {/if}
               </span>
-              {#if isEditing}
+              {#if isEditingBib}
                 <form
                   class="row-main"
                   onsubmit={(e) => {
@@ -464,59 +635,83 @@
                     placeholder="BIB"
                     autocomplete="off"
                   />
-                  <span class="row-hint">nuovo pettorale</span>
-                  <button
-                    type="submit"
-                    class="btn-row btn-row-confirm"
-                    title="Salva"
-                    aria-label="Salva"
-                  >
-                    ✓
-                  </button>
+                  <span class="row-hint">{$t.lane.newBibHint}</span>
+                  <button type="submit" class="btn-row btn-row-confirm" title={$t.common.save}><Check size={14} /></button>
                   <button
                     type="button"
                     class="btn-row"
-                    title="Annulla modifica"
-                    aria-label="Annulla modifica"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      cancelEditBib();
-                    }}
-                  >
-                    ⌫
-                  </button>
+                    title={$t.common.cancel}
+                    onclick={(e) => { e.stopPropagation(); cancelEditBib(); }}
+                  ><Undo2 size={14} /></button>
+                </form>
+              {:else if isEditingName}
+                <form
+                  class="row-main"
+                  onsubmit={(e) => { e.preventDefault(); doSaveAthleteName(r.f.athlete); }}
+                >
+                  <!-- svelte-ignore a11y_autofocus -->
+                  <input
+                    type="text"
+                    class="bib-input"
+                    bind:value={editAthleteFirst}
+                    placeholder={$t.lane.firstNamePlaceholder}
+                    autocomplete="off"
+                    autofocus
+                  />
+                  <input
+                    type="text"
+                    class="bib-input"
+                    bind:value={editAthleteLast}
+                    placeholder={$t.lane.lastNamePlaceholder}
+                    autocomplete="off"
+                  />
+                  <button type="submit" class="btn-row btn-row-confirm" title={$t.common.save}><Check size={14} /></button>
+                  <button
+                    type="button"
+                    class="btn-row"
+                    title={$t.common.cancel}
+                    onclick={(e) => { e.stopPropagation(); cancelEditAthleteName(); }}
+                  ><Undo2 size={14} /></button>
                 </form>
               {:else}
                 <div class="row-main">
                   <span class="row-bib num">#{r.f.athlete.bib_number}</span>
-                  <span class="row-name truncate">
-                    {r.f.athlete.first_name} {r.f.athlete.last_name}
-                  </span>
+                  {#if anon}
+                    <span class="anon-badge">{$t.lane.anonBadge}</span>
+                  {:else}
+                    <span class="row-name truncate">
+                      {r.f.athlete.first_name} {r.f.athlete.last_name}
+                    </span>
+                  {/if}
+                  <button
+                    type="button"
+                    class="btn-row"
+                    class:btn-row-warn={anon}
+                    title={$t.common.edit}
+                    aria-label={$t.common.edit}
+                    onclick={(e) => { e.stopPropagation(); startEditAthleteName(r.f.athlete); }}
+                  >✎</button>
                   {#if r.f.timing_id != null}
                     <button
                       type="button"
                       class="btn-row"
-                      title="Modifica pettorale"
-                      aria-label="Modifica pettorale"
+                      title={$t.lane.newBibHint}
+                      aria-label={$t.lane.newBibHint}
                       onclick={(e) => {
                         e.stopPropagation();
                         startEditBib(r.f.timing_id!, r.f.athlete.bib_number);
                       }}
-                    >
-                      ✎
-                    </button>
+                    >#</button>
                     <button
                       type="button"
                       class="btn-row btn-row-danger"
-                      title="Annulla arrivo"
-                      aria-label="Annulla arrivo"
+                      title={$t.common.cancel}
+                      aria-label={$t.common.cancel}
                       onclick={(e) => {
                         e.stopPropagation();
                         doUndoFinish(r.f.timing_id!, r.f.athlete.bib_number);
                       }}
-                    >
-                      ✕
-                    </button>
+                    ><X size={14} /></button>
                   {/if}
                 </div>
               {/if}
@@ -544,7 +739,6 @@
     onClose={() => (showEndModal = false)}
     onConfirm={async (typed) => {
       await api.endCourse(course.id, typed);
-      ended = true;
       await refresh();
     }}
   />
@@ -557,13 +751,22 @@
     onClose={() => (showRestartModal = false)}
     onConfirm={async (typed) => {
       await api.restartCourse(course.id, typed);
-      ended = false;
-      started = false;
-      elapsed = 0;
       pending = [];
       finishers = [];
-      bibInputs = {};
+      selectedAthletes = {};
       await refresh();
+    }}
+  />
+{/if}
+
+{#if confirmState}
+  <ConfirmModal
+    message={confirmState.message}
+    onCancel={() => (confirmState = null)}
+    onConfirm={() => {
+      const c = confirmState;
+      confirmState = null;
+      c?.onConfirm();
     }}
   />
 {/if}
@@ -571,16 +774,69 @@
 <style>
   .lane-card {
     overflow: hidden;
+    container-type: inline-size;
+  }
+  /* In a very narrow column the colored dot + action button already convey
+     state; drop the redundant status word so the header stops crowding. */
+  @container (max-width: 300px) {
+    .header-status {
+      display: none;
+    }
+  }
+  /* Timer scales to the column width (cqi), not the viewport, so it never
+     overflows or clips in a narrow split column / small window. */
+  .timer-wrap {
+    container-type: inline-size;
+    overflow: hidden;
+  }
+  .chronodial {
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .rows-list {
+    container-type: inline-size;
   }
   .row {
     display: grid;
-    grid-template-columns: 2.25rem 5.5rem 1fr;
+    grid-template-columns: 2.25rem 8rem 1fr;
+    grid-template-areas: "pos time main";
     align-items: center;
     gap: 0.6rem;
     padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--line-1);
     font-size: 0.9rem;
     transition: background 100ms;
+  }
+  .row > .pos-chip { grid-area: pos; }
+  .row > .row-time-col { grid-area: time; }
+  .row > .row-main { grid-area: main; }
+
+  /* Narrow card (small window / phone): stack time on top, controls below full width */
+  @container (max-width: 400px) {
+    .row {
+      grid-template-columns: 2.25rem 1fr;
+      grid-template-areas:
+        "pos time"
+        "main main";
+      row-gap: 0.5rem;
+      align-items: center;
+    }
+    .row > .row-time-col {
+      flex-direction: row;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .row > .row-main {
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+    .row > .row-main :global(.bib-combobox.compact) {
+      flex: 1 1 8rem;
+      width: auto;
+    }
+    .row-name {
+      max-width: none;
+    }
   }
   .row:last-child {
     border-bottom: none;
@@ -619,17 +875,28 @@
     background: var(--accent-running);
     color: #f6f2e9;
   }
+  .row-time-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.05rem;
+  }
   .row-time {
     color: var(--fg-0);
     font-weight: 700;
     font-size: 0.95rem;
     letter-spacing: -0.01em;
   }
+  .row-elapsed {
+    color: var(--fg-3);
+    font-size: 0.72rem;
+    letter-spacing: -0.01em;
+  }
   .row-main {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.4rem;
     min-width: 0;
+    justify-content: flex-end;
   }
   .row-bib {
     color: var(--accent-running);
@@ -639,23 +906,25 @@
   .row-name {
     color: var(--fg-1);
     font-weight: 500;
-    flex: 1;
     min-width: 0;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .row-hint {
     color: var(--fg-3);
     font-size: 0.7rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    flex: 1;
   }
   .bib-input {
-    width: 4.5rem;
-    text-align: center;
-    padding: 0.3rem 0.4rem;
-    font-size: 0.95rem;
-    font-weight: 700;
-    flex-shrink: 0;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.35rem;
+    width: 7rem;
+  }
+  .bib-input.num {
+    width: 10rem;
   }
   .btn-row {
     display: inline-flex;
@@ -698,42 +967,40 @@
   .btn-row-danger:active {
     background: rgba(184, 85, 58, 0.2);
   }
-  .btn-header-end,
-  .btn-header-restart {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.32rem 0.65rem;
-    border-radius: var(--radius-pill);
-    border: 1px solid currentColor;
-    background: transparent;
-    cursor: pointer;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    transition:
-      background 120ms ease,
-      color 120ms ease,
-      transform 80ms ease;
+  .btn-row-warn {
+    color: var(--accent-pending);
+    border-color: rgba(192, 138, 42, 0.4);
   }
-  .btn-header-end {
-    color: var(--accent-finish);
-  }
-  .btn-header-end:hover {
-    background: var(--accent-finish);
-    color: #f6f2e9;
-  }
-  .btn-header-restart {
+  .btn-row-warn:hover {
+    background: rgba(192, 138, 42, 0.12);
     color: var(--accent-pending);
   }
-  .btn-header-restart:hover {
-    background: var(--accent-pending);
-    color: #f6f2e9;
+  .row-anon {
+    border-left: 3px solid var(--accent-pending);
+    padding-left: calc(0.75rem - 3px);
   }
-  .btn-header-end:active,
-  .btn-header-restart:active {
-    transform: translateY(1px);
+  .anon-badge {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent-pending);
+    border: 1px dashed var(--accent-pending);
+    border-radius: var(--radius-pill);
+    padding: 0.1rem 0.4rem;
+    flex-shrink: 0;
+  }
+  .btn-row-move {
+    color: var(--fg-1);
+    border-color: var(--line-2);
+    font-size: 0.72rem;
+    padding: 0 0.4rem;
+    width: auto;
+    white-space: nowrap;
+  }
+  .btn-row-move:hover {
+    background: var(--bg-3);
+    color: var(--fg-0);
   }
   .btn-tie {
     display: inline-flex;

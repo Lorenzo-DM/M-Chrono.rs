@@ -11,6 +11,7 @@ mod sync;
 mod api;
 mod auth;
 mod export;
+mod import;
 mod app_ctx;
 
 use crate::app_ctx::AppCtx;
@@ -36,7 +37,7 @@ fn init_tracing(log_dir: &std::path::Path) {
     Box::leak(Box::new(guard));
 
     let filter = tracing_subscriber::EnvFilter::from_default_env()
-        .add_directive("trailtrace_stopwatch_lib=info".parse().unwrap());
+        .add_directive("m_chrono_lib=info".parse().unwrap());
 
     tracing_subscriber::registry()
         .with(filter)
@@ -112,6 +113,7 @@ pub fn run() {
             commands::withdraw_athlete,
             commands::undo_finish,
             commands::delete_pending_finish,
+            commands::move_pending_to_course,
             commands::reassign_bib,
             commands::end_course,
             commands::restart_course,
@@ -123,6 +125,26 @@ pub fn run() {
             commands::fetch_remote_data,
             commands::get_duplicate_groups,
             commands::export_results_xlsx,
+            commands::export_results_csv,
+            commands::get_results_by_course,
+            commands::import_athletes_file,
+            commands::save_athlete,
+            commands::delete_athlete,
+            commands::get_all_athletes,
+            commands::withdraw_by_athlete_id,
+            commands::mark_dns_by_athlete_id,
+            commands::get_races,
+            commands::save_race,
+            commands::delete_race,
+            commands::save_course,
+            commands::delete_course,
+            commands::get_checkpoints,
+            commands::save_checkpoint,
+            commands::delete_checkpoint,
+            commands::record_split,
+            commands::get_splits_by_course,
+            commands::backup_database,
+            commands::restore_database,
         ])
         .run(tauri::generate_context!())
         .expect("error running tauri application");

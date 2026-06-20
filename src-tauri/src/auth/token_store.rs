@@ -1,7 +1,7 @@
 use crate::error::{AppError, AppResult};
 use std::sync::RwLock;
 
-const SERVICE: &str = "trailtrace-stopwatch";
+const SERVICE: &str = "m-chrono";
 const ACCOUNT_REFRESH: &str = "refresh_token";
 
 #[derive(Debug, Clone)]

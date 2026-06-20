@@ -1,6 +1,18 @@
 <script lang="ts">
+  import { breakpoint } from '../breakpoint';
   import { syncStatus, config, layoutMode } from '../stores';
   import type { LayoutMode, NavView } from '../stores';
+  import { cycleQuickToggle, resolvedTheme } from '../theme';
+  import Button from '../ui/Button.svelte';
+  import SegmentedControl from '../ui/SegmentedControl.svelte';
+  import {
+    Timer, ListOrdered, Settings, Download,
+    LayoutPanelTop, Columns2, LayoutGrid,
+    Menu, Sun, Moon, TriangleAlert,
+  } from 'lucide-svelte';
+  import { t } from '../i18n';
+
+  type LucideIcon = typeof Timer;
 
   let {
     current = 'timing',
@@ -12,17 +24,17 @@
     onDuplicates: () => void;
   }>();
 
-  const navItems: { id: NavView; label: string; enabled: boolean }[] = [
-    { id: 'timing',   label: 'Timing',   enabled: true  },
-    { id: 'results',  label: 'Results',  enabled: false },
-    { id: 'settings', label: 'Settings', enabled: true  },
-    { id: 'export',   label: 'Export',   enabled: false },
-  ];
+  let navItems = $derived([
+    { id: 'timing'   as NavView, label: $t.nav.timing,   icon: Timer,       enabled: true },
+    { id: 'results'  as NavView, label: $t.nav.results,  icon: ListOrdered, enabled: true },
+    { id: 'settings' as NavView, label: $t.nav.settings, icon: Settings,    enabled: true },
+    { id: 'export'   as NavView, label: $t.nav.export,   icon: Download,    enabled: true },
+  ]);
 
-  const modes: { id: LayoutMode; label: string; icon: string }[] = [
-    { id: 'tabs',  label: 'Tabs',  icon: '▭'  },
-    { id: 'split', label: 'Split', icon: '▭▭' },
-    { id: 'grid',  label: 'Grid',  icon: '▦'  },
+  const modes: { id: LayoutMode; label: string; icon: LucideIcon }[] = [
+    { id: 'tabs',  label: 'Tabs',  icon: LayoutPanelTop },
+    { id: 'split', label: 'Split', icon: Columns2       },
+    { id: 'grid',  label: 'Grid',  icon: LayoutGrid     },
   ];
 
   function operatorColor(id?: string) {
@@ -34,87 +46,233 @@
     if (last === 'D') return 'var(--op-d)';
     return 'var(--accent-running)';
   }
+
+  let mobileDrawerOpen = $state(false);
+  let isMobile = $derived($breakpoint === 'mobile');
+
+  $effect(() => {
+    if (!isMobile) {
+      mobileDrawerOpen = false;
+    }
+  });
+
+  function closeDrawer() {
+    mobileDrawerOpen = false;
+  }
+
+  function navClick(id: NavView) {
+    onNav(id);
+    closeDrawer();
+  }
+
+  function duplicatesClick() {
+    onDuplicates();
+    closeDrawer();
+  }
 </script>
 
-<header class="border-b" style="background: var(--bg-1); border-color: var(--line-2); box-shadow: var(--shadow-sm)">
-  <div class="flex items-center gap-6 px-5 py-3">
+<header
+  class="border-b"
+  style="background: var(--bg-1); border-color: var(--line-2); box-shadow: var(--shadow-sm)"
+>
+  <div class="flex items-center gap-3 sm:gap-4 lg:gap-6 px-3 sm:px-4 lg:px-5 py-3">
     <!-- Brand -->
     <div class="flex items-center gap-3 shrink-0">
-      <div class="hud-strong text-base" style="color: var(--fg-0); letter-spacing: 0.08em">
-        TRAIL<span style="color: var(--accent-running)">·</span>TRACE
+      <div class="hud-strong text-sm sm:text-base" style="color: var(--fg-0); letter-spacing: 0.08em">
+        M<span style="color: var(--accent-running)">-</span>Chrono
       </div>
-      <div class="hud" style="color: var(--fg-3)">CHRONO v0.1</div>
     </div>
-
-    <!-- Nav -->
-    <nav class="flex items-center gap-1 ml-4">
-      {#each navItems as n (n.id)}
-        <button
-          class="nav-link"
-          data-active={current === n.id}
-          data-disabled={!n.enabled}
-          disabled={!n.enabled}
-          onclick={() => n.enabled && onNav(n.id)}
-          title={n.enabled ? n.label : `${n.label} — prossimamente`}
-        >
-          {n.label}
-        </button>
-      {/each}
-    </nav>
 
     <div class="flex-1"></div>
 
-    <!-- Layout switcher (timing view only) -->
-    {#if current === 'timing'}
-      <div class="seg" title="Layout">
-        {#each modes as m (m.id)}
+    {#if isMobile}
+      <div class="flex items-center gap-2 shrink-0">
+        <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
+          {$config?.operator_id || 'NO-OP'}
+        </div>
+
+        <div class="flex items-center gap-2">
+          {#if !$config?.sync_enabled}
+            <span class="dot-idle" style="background: var(--fg-3);"></span>
+            <div class="hud hidden sm:block" style="color: var(--fg-3)">LOCALE</div>
+          {:else}
+            <span
+              class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+              style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+            ></span>
+            <div
+              class="hud hidden sm:block"
+              style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
+            >
+              {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+            </div>
+          {/if}
+        </div>
+
+        <Button
+          variant="ghost"
+          class="text-xs px-2 py-2"
+          onclick={() => (mobileDrawerOpen = !mobileDrawerOpen)}
+          ariaLabel="Menu"
+          ariaExpanded={mobileDrawerOpen}
+          title="Menu"
+        >
+          <Menu size={18} />
+        </Button>
+      </div>
+    {:else}
+      <!-- Nav -->
+      <nav class="flex items-center gap-1 ml-1 lg:ml-4">
+        {#each navItems as n (n.id)}
+          {@const NavIcon = n.icon}
           <button
-            class="seg-item"
-            data-active={$layoutMode === m.id}
-            onclick={() => layoutMode.set(m.id)}
-            aria-label={m.label}
-            title={m.label}
+            class="nav-link"
+            data-active={current === n.id}
+            data-disabled={!n.enabled}
+            disabled={!n.enabled}
+            onclick={() => n.enabled && onNav(n.id)}
+            title={n.enabled ? n.label : `${n.label} — ${$t.common.comingSoon}`}
           >
-            <span class="num">{m.icon}</span>
+            <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
+            {n.label}
           </button>
         {/each}
+      </nav>
+
+      <div class="flex-1"></div>
+
+      <!-- Layout switcher -->
+      <div class:invisible={current !== 'timing'} aria-hidden={current !== 'timing'}>
+        <SegmentedControl
+          ariaLabel="Layout"
+          options={modes.map((m) => ({ value: m.id, label: m.label, icon: m.icon, title: m.label }))}
+          value={$layoutMode}
+          onChange={(v) => layoutMode.set(v as LayoutMode)}
+        />
+      </div>
+
+      <!-- Status cluster -->
+      <div class="flex items-center gap-2 lg:gap-4 shrink-0">
+        <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
+          {$config?.operator_id || 'NO-OP'}
+        </div>
+
+        <div class="flex items-center gap-2">
+          {#if !$config?.sync_enabled}
+            <span class="dot-idle" style="background: var(--fg-3);"></span>
+            <div class="hud hidden lg:block" style="color: var(--fg-3)">LOCALE</div>
+          {:else}
+            <span
+              class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
+              style={$syncStatus.is_online ? '' : 'background: var(--accent-pending);'}
+            ></span>
+            <div
+              class="hud hidden lg:block"
+              style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
+            >
+              {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
+            </div>
+          {/if}
+        </div>
+
+        {#if $config?.sync_enabled}
+          <div class="hud hidden lg:block">
+            <span style="color: var(--fg-2)">QUEUE</span>
+            <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+          </div>
+        {/if}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={cycleQuickToggle}
+          title={$resolvedTheme === 'dark' ? $t.header.switchToLight : $t.header.switchToDark}
+          ariaLabel={$t.header.changeTheme}
+        >
+          {#if $resolvedTheme === 'dark'}<Sun size={16} />{:else}<Moon size={16} />{/if}
+        </Button>
+
+        {#if $config?.sync_enabled}
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title={$t.header.duplicates}>
+            <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
+          </Button>
+        {/if}
       </div>
     {/if}
-
-    <!-- Status cluster -->
-    <div class="flex items-center gap-4 shrink-0">
-      <div class="op-chip" style="color: {operatorColor($config?.operator_id)}">
-        {$config?.operator_id || 'NO-OP'}
-      </div>
-
-      <div class="flex items-center gap-2">
-        <span
-          class={$syncStatus.is_online ? 'dot-running' : 'dot-idle'}
-          style={$syncStatus.is_online
-            ? ''
-            : 'background: var(--accent-pending);'}
-        ></span>
-        <div
-          class="hud"
-          style="color: {$syncStatus.is_online ? 'var(--accent-running)' : 'var(--accent-pending)'}"
-        >
-          {$syncStatus.is_online ? 'ONLINE' : 'OFFLINE'}
-        </div>
-      </div>
-
-      <div class="hud">
-        <span style="color: var(--fg-2)">QUEUE</span>
-        <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
-      </div>
-
-      <button class="btn-base btn-ghost text-xs" onclick={onDuplicates} title="Duplicati">
-        <span style="color: var(--accent-dup)">⚠</span> DUP
-      </button>
-    </div>
   </div>
+
+  {#if isMobile && mobileDrawerOpen}
+    <div
+      class="border-t px-3 py-3 flex flex-col gap-3"
+      style="border-color: var(--line-2); background: var(--bg-1)"
+    >
+      <nav class="flex flex-wrap gap-1">
+        {#each navItems as n (n.id)}
+          {@const NavIcon = n.icon}
+          <button
+            class="nav-link"
+            data-active={current === n.id}
+            data-disabled={!n.enabled}
+            disabled={!n.enabled}
+            onclick={() => n.enabled && navClick(n.id)}
+            title={n.enabled ? n.label : `${n.label} — ${$t.common.comingSoon}`}
+          >
+            <span class="nav-ico" aria-hidden="true"><NavIcon size={14} /></span>
+            {n.label}
+          </button>
+        {/each}
+      </nav>
+
+      {#if current === 'timing'}
+        <SegmentedControl
+          fullWidth
+          ariaLabel="Layout"
+          options={modes.map((m) => ({ value: m.id, label: m.label, icon: m.icon, title: m.label }))}
+          value={$layoutMode}
+          onChange={(v) => layoutMode.set(v as LayoutMode)}
+        />
+      {/if}
+
+      <div class="flex items-center gap-2 flex-wrap">
+        {#if $config?.sync_enabled}
+          <div class="hud">
+            <span style="color: var(--fg-2)">QUEUE</span>
+            <span class="num ml-1" style="color: var(--fg-0)">{$syncStatus.pending_count}</span>
+          </div>
+        {/if}
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={cycleQuickToggle}
+          title={$resolvedTheme === 'dark' ? $t.header.switchToLight : $t.header.switchToDark}
+          ariaLabel={$t.header.changeTheme}
+        >
+          {#if $resolvedTheme === 'dark'}
+            <Sun size={16} /> {$t.header.switchToLight}
+          {:else}
+            <Moon size={16} /> {$t.header.switchToDark}
+          {/if}
+        </Button>
+
+        {#if $config?.sync_enabled}
+          <Button variant="ghost" size="sm" onclick={duplicatesClick} title={$t.header.duplicates}>
+            <span style="color: var(--accent-dup)"><TriangleAlert size={14} /></span> DUP
+          </Button>
+        {/if}
+      </div>
+    </div>
+  {/if}
 </header>
 
 <style>
+  .nav-ico {
+    display: inline-block;
+    margin-right: 0.35rem;
+    font-size: 0.95em;
+    opacity: 0.85;
+    font-style: normal;
+  }
   .nav-link {
     padding: 0.4rem 0.85rem;
     font-size: 0.82rem;

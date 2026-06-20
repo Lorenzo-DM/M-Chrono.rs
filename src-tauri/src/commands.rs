@@ -1,6 +1,6 @@
 use crate::app_ctx::AppCtx;
 use crate::error::AppError;
-use crate::models::{Athlete, Course, DeviceCodeResponse, PendingFinish, Timing};
+use crate::models::{Athlete, Course, DeviceCodeResponse, PendingFinish, Race, Timing};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
@@ -183,6 +183,13 @@ pub async fn delete_pending_finish(ctx: State<'_, AppCtx>, pending_id: i64) -> R
 }
 
 #[tauri::command]
+pub async fn move_pending_to_course(app: AppHandle, ctx: State<'_, AppCtx>, pending_id: i64, target_course_id: i64) -> Result<(), AppError> {
+    let p = crate::timer::move_pending_to_course(&ctx.state, &ctx.repo, pending_id, target_course_id).await?;
+    let _ = app.emit("pending:captured", &p);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn reassign_bib(app: AppHandle, ctx: State<'_, AppCtx>, timing_id: i64, new_bib: i64)
     -> Result<Timing, AppError> {
     let op = current_operator(&ctx).await?;
@@ -252,6 +259,7 @@ pub struct ConfigPatch {
     pub operator_id: Option<String>,
     pub dedup_window_ms: Option<i64>,
     pub dedup_warn_delta_ms: Option<i64>,
+    pub sync_enabled: Option<bool>,
 }
 
 #[tauri::command]
@@ -268,6 +276,7 @@ pub async fn update_config(
     if let Some(v) = patch.operator_id       { cfg.operator_id = v; }
     if let Some(v) = patch.dedup_window_ms   { cfg.dedup_window_ms = v; }
     if let Some(v) = patch.dedup_warn_delta_ms { cfg.dedup_warn_delta_ms = v; }
+    if let Some(v) = patch.sync_enabled        { cfg.sync_enabled = v; }
     cfg.save(&ctx.config_path)?;
     Ok(cfg.clone())
 }
@@ -338,6 +347,220 @@ pub async fn fetch_remote_data(ctx: State<'_, AppCtx>) -> Result<FetchSummary, A
     })
 }
 
+async fn refresh_state(ctx: &AppCtx) -> Result<(), AppError> {
+    let snap = crate::state::bootstrap_from_db(&ctx.repo, &*ctx.clock)?;
+    *ctx.state.write().await = snap;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_races(ctx: State<'_, AppCtx>) -> Result<Vec<Race>, AppError> {
+    ctx.repo.list_races()
+}
+
+#[derive(serde::Deserialize)]
+pub struct RaceInput {
+    pub name: String,
+    pub scheduled_at_ms: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn save_race(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: RaceInput,
+) -> Result<Race, AppError> {
+    let name = input.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::InvalidState("nome gara obbligatorio".into()));
+    }
+    let race = Race {
+        id: match id {
+            Some(v) => v,
+            None => ctx.repo.next_local_race_id()?,
+        },
+        name,
+        scheduled_at_ms: input.scheduled_at_ms,
+    };
+    ctx.repo.upsert_race(&race)?;
+    let _ = app.emit("data:changed", ());
+    Ok(race)
+}
+
+#[tauri::command]
+pub async fn delete_race(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_race(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+pub struct CourseInput {
+    pub name: String,
+    pub race_id: Option<i64>,
+    #[serde(default)]
+    pub distance_m: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn save_course(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: CourseInput,
+) -> Result<Course, AppError> {
+    let name = input.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::InvalidState("nome percorso obbligatorio".into()));
+    }
+    let distance_m = input.distance_m.filter(|d| *d > 0);
+    let course = match id {
+        Some(cid) => {
+            ctx.repo.update_course(cid, &name, input.race_id, distance_m)?;
+            ctx.repo
+                .list_courses()?
+                .into_iter()
+                .find(|c| c.id == cid)
+                .ok_or_else(|| AppError::NotFound(format!("course {}", cid)))?
+        }
+        None => {
+            let course = Course {
+                id: ctx.repo.next_local_course_id()?,
+                name,
+                distance_m,
+                started_at_ms: None,
+                scheduled_at_ms: None,
+                ended_at_ms: None,
+                race_id: input.race_id,
+            };
+            ctx.repo.upsert_course(&course)?;
+            course
+        }
+    };
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(course)
+}
+
+#[tauri::command]
+pub async fn delete_course(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_course(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn import_athletes_file(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    path: String,
+) -> Result<crate::import::ImportSummary, AppError> {
+    let repo = ctx.repo.clone();
+    let p = std::path::PathBuf::from(path);
+    let summary = tokio::task::spawn_blocking(move || crate::import::import_file(&repo, &p))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(summary)
+}
+
+#[derive(serde::Deserialize)]
+pub struct AthleteInput {
+    pub bib_number: i64,
+    pub first_name: String,
+    pub last_name: String,
+    pub course_id: Option<i64>,
+    pub course_name: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub anonymous: bool,
+}
+
+#[tauri::command]
+pub async fn save_athlete(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: AthleteInput,
+) -> Result<Athlete, AppError> {
+    if input.bib_number <= 0 {
+        return Err(AppError::InvalidState("pettorale deve essere positivo".into()));
+    }
+    let first = input.first_name.trim().to_string();
+    let last = input.last_name.trim().to_string();
+    // Anonymous athletes (free bib entry) carry no name on purpose.
+    if !input.anonymous && first.is_empty() && last.is_empty() {
+        return Err(AppError::InvalidState("nome e cognome mancanti".into()));
+    }
+
+    let course_id = match (input.course_id, input.course_name.as_deref()) {
+        (Some(cid), _) => cid,
+        (None, Some(name)) if !name.trim().is_empty() => {
+            crate::import::get_or_create_course(&ctx.repo, name)?.0
+        }
+        _ => return Err(AppError::InvalidState("percorso mancante".into())),
+    };
+
+    if let Some(existing) = ctx.repo.find_athlete_by_bib(input.bib_number)? {
+        if Some(existing.id) != id {
+            return Err(AppError::InvalidState(format!(
+                "pettorale {} già assegnato a {} {}",
+                input.bib_number, existing.first_name, existing.last_name
+            )));
+        }
+    }
+
+    let category = input.category
+        .map(|c| c.trim().to_string())
+        .filter(|c| !c.is_empty());
+    let athlete = Athlete {
+        id: match id {
+            Some(v) => v,
+            None => ctx.repo.next_local_athlete_id()?,
+        },
+        bib_number: input.bib_number,
+        first_name: first,
+        last_name: last,
+        course_id,
+        category,
+        anonymous: input.anonymous,
+    };
+    ctx.repo.upsert_athlete(&athlete)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(athlete)
+}
+
+#[tauri::command]
+pub async fn delete_athlete(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: i64,
+) -> Result<(), AppError> {
+    ctx.repo.delete_athlete(id)?;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_all_athletes(ctx: State<'_, AppCtx>) -> Result<Vec<Athlete>, AppError> {
+    ctx.repo.list_athletes()
+}
+
 #[tauri::command]
 pub async fn get_duplicate_groups(
     ctx: State<'_, AppCtx>,
@@ -359,4 +582,144 @@ pub async fn export_results_xlsx(
     tokio::task::spawn_blocking(move || crate::export::xlsx::write_results(&repo, &p))
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn export_results_csv(
+    ctx: State<'_, AppCtx>,
+    path: String,
+) -> Result<crate::export::csv::ExportSummary, AppError> {
+    let repo = ctx.repo.clone();
+    let p = std::path::PathBuf::from(path);
+    tokio::task::spawn_blocking(move || crate::export::csv::write_results(&repo, &p))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn get_results_by_course(
+    ctx: State<'_, AppCtx>,
+    course_id: i64,
+) -> Result<Vec<crate::db::repo::ResultRow>, AppError> {
+    ctx.repo.list_results_by_course(course_id)
+}
+
+#[tauri::command]
+pub async fn withdraw_by_athlete_id(app: AppHandle, ctx: State<'_, AppCtx>, athlete_id: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::set_timing_status_by_athlete(
+        &ctx.state, &ctx.repo, athlete_id, &op,
+        crate::models::TimingStatus::Withdrawn,
+    ).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+#[tauri::command]
+pub async fn mark_dns_by_athlete_id(app: AppHandle, ctx: State<'_, AppCtx>, athlete_id: i64)
+    -> Result<Timing, AppError> {
+    let op = current_operator(&ctx).await?;
+    let t = crate::timer::set_timing_status_by_athlete(
+        &ctx.state, &ctx.repo, athlete_id, &op,
+        crate::models::TimingStatus::Dns,
+    ).await?;
+    let _ = app.emit("athlete:finished", &t);
+    Ok(t)
+}
+
+// ---- Checkpoints / splits --------------------------------------------------
+
+#[tauri::command]
+pub async fn get_checkpoints(ctx: State<'_, AppCtx>) -> Result<Vec<crate::models::Checkpoint>, AppError> {
+    ctx.repo.list_checkpoints()
+}
+
+#[derive(serde::Deserialize)]
+pub struct CheckpointInput {
+    pub course_id: i64,
+    pub name: String,
+    pub position: i64,
+}
+
+#[tauri::command]
+pub async fn save_checkpoint(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    id: Option<i64>,
+    input: CheckpointInput,
+) -> Result<crate::models::Checkpoint, AppError> {
+    let name = input.name.trim().to_string();
+    if name.is_empty() {
+        return Err(AppError::InvalidState("nome checkpoint obbligatorio".into()));
+    }
+    let cp = crate::models::Checkpoint {
+        id: match id { Some(v) => v, None => ctx.repo.next_local_checkpoint_id()? },
+        course_id: input.course_id,
+        name,
+        position: input.position,
+    };
+    ctx.repo.upsert_checkpoint(&cp)?;
+    let _ = app.emit("data:changed", ());
+    Ok(cp)
+}
+
+#[tauri::command]
+pub async fn delete_checkpoint(app: AppHandle, ctx: State<'_, AppCtx>, id: i64)
+    -> Result<(), AppError> {
+    ctx.repo.delete_checkpoint(id)?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn record_split(
+    app: AppHandle,
+    ctx: State<'_, AppCtx>,
+    checkpoint_id: i64,
+    bib: i64,
+) -> Result<crate::models::Split, AppError> {
+    let op = current_operator(&ctx).await?;
+    let (athlete_id, course_id) = {
+        let s = ctx.state.read().await;
+        let a = s.athletes_by_bib.get(&bib).cloned()
+            .ok_or_else(|| AppError::NotFound(format!("pettorale {} non trovato", bib)))?;
+        (a.id, a.course_id)
+    };
+    let split = crate::timer::record_split(
+        &ctx.state, &ctx.repo, &*ctx.clock, athlete_id, checkpoint_id, course_id, &op,
+    ).await?;
+    let _ = app.emit("split:recorded", &split);
+    Ok(split)
+}
+
+#[tauri::command]
+pub async fn get_splits_by_course(ctx: State<'_, AppCtx>, course_id: i64)
+    -> Result<Vec<crate::models::Split>, AppError> {
+    ctx.repo.list_splits_by_course(course_id)
+}
+
+// ---- Backup / restore ------------------------------------------------------
+
+#[tauri::command]
+pub async fn backup_database(ctx: State<'_, AppCtx>, path: String) -> Result<String, AppError> {
+    let repo = ctx.repo.clone();
+    let dest = std::path::PathBuf::from(&path);
+    tokio::task::spawn_blocking(move || repo.backup_to(&dest))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    Ok(path)
+}
+
+#[tauri::command]
+pub async fn restore_database(app: AppHandle, ctx: State<'_, AppCtx>, path: String)
+    -> Result<(), AppError> {
+    let repo = ctx.repo.clone();
+    let src = std::path::PathBuf::from(path);
+    tokio::task::spawn_blocking(move || repo.restore_from(&src))
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))??;
+    refresh_state(&ctx).await?;
+    let _ = app.emit("data:changed", ());
+    Ok(())
 }

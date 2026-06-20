@@ -1,12 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from './lib/api';
-  import { courses, config, activeCourseId, isAuthenticated, type NavView } from './lib/stores';
+  import {
+    courses, config, activeCourseId, isAuthenticated, type NavView,
+    startDisplayPoll, stopDisplayPoll, refreshAthletes, refreshCheckpoints,
+  } from './lib/stores';
+  import { on } from './lib/events';
   import Header from './lib/components/Header.svelte';
   import Workspace from './lib/components/Workspace.svelte';
   import SettingsPage from './lib/components/SettingsPage.svelte';
+  import ResultsPage from './lib/components/ResultsPage.svelte';
+  import ExportPage from './lib/components/ExportPage.svelte';
   import DuplicateReviewModal from './lib/components/DuplicateReviewModal.svelte';
   import IntroFlow from './lib/components/IntroFlow.svelte';
+  import { t } from './lib/i18n';
 
   type View = NavView | 'intro';
   let view = $state<View>('timing');
@@ -14,11 +21,7 @@
   let showDup = $state(false);
 
   function needsIntro(): boolean {
-    const cfg = $config;
-    if (!cfg) return true;
-    if (!cfg.operator_id?.trim()) return true;
-    if ($courses.length === 0 && !$isAuthenticated) return true;
-    return false;
+    return !$config?.operator_id?.trim();
   }
 
   onMount(() => {
@@ -34,7 +37,24 @@
       if (c.length > 0) activeCourseId.set(c[0].id);
       view = needsIntro() ? 'intro' : 'timing';
       booted = true;
+      await Promise.all([refreshAthletes(), refreshCheckpoints()]);
     })();
+
+    // Single shared display poll + roster refresh on data-changing events.
+    startDisplayPoll();
+    const unsubs: Array<() => void> = [];
+    const refreshCourses = () => api.getCourses().then(courses.set);
+    on('data:changed', () => {
+      refreshAthletes();
+      refreshCheckpoints();
+      refreshCourses();
+    }).then((u) => unsubs.push(u));
+    on('athlete:finished', () => refreshAthletes()).then((u) => unsubs.push(u));
+    // Course lifecycle changes started_at/ended_at; keep the store in sync so
+    // status dots reflect the real state.
+    on('course:started', refreshCourses).then((u) => unsubs.push(u));
+    on('course:ended', refreshCourses).then((u) => unsubs.push(u));
+    on('course:reset', refreshCourses).then((u) => unsubs.push(u));
 
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -54,6 +74,8 @@
 
     return () => {
       window.removeEventListener('keydown', onKey);
+      stopDisplayPoll();
+      for (const u of unsubs) u();
     };
   });
 
@@ -82,9 +104,9 @@
         class="text-2xl font-semibold"
         style="color: var(--fg-0); letter-spacing: -0.01em"
       >
-        TrailTrace<span style="color: var(--accent-running)">·</span>Chrono
+        M-Chrono
       </div>
-      <div class="hud mt-2" style="color: var(--fg-3)">CARICAMENTO…</div>
+      <div class="hud mt-2" style="color: var(--fg-3)">{$t.common.loading}</div>
     </div>
   </main>
 {:else if view === 'intro'}
@@ -95,33 +117,20 @@
 
     <main class="flex-1 min-h-0 overflow-hidden">
       {#if view === 'timing'}
-        <Workspace />
+        <div class="h-full min-h-0">
+          <Workspace />
+        </div>
       {:else if view === 'settings'}
-        <SettingsPage onBack={() => (view = 'timing')} />
+        <div class="h-full overflow-auto">
+          <SettingsPage onBack={() => (view = 'timing')} />
+        </div>
       {:else if view === 'results'}
-        <div class="h-full flex items-center justify-center p-8">
-          <div class="panel max-w-md w-full text-center" style="padding: 2rem 2rem">
-            <div class="hud-strong mb-2" style="color: var(--fg-0)">RESULTS</div>
-            <div class="hud mb-4" style="color: var(--accent-pending)">PROSSIMAMENTE</div>
-            <div class="text-sm" style="color: var(--fg-2)">
-              Classifica globale e per percorso, filtri per categoria, ordinamento e
-              ricerca. Per ora consulta la coda di arrivi sotto ciascun timer.
-            </div>
-            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
-          </div>
+        <div class="h-full overflow-auto">
+          <ResultsPage />
         </div>
       {:else if view === 'export'}
-        <div class="h-full flex items-center justify-center p-8">
-          <div class="panel max-w-md w-full text-center" style="padding: 2rem 2rem">
-            <div class="hud-strong mb-2" style="color: var(--fg-0)">EXPORT</div>
-            <div class="hud mb-4" style="color: var(--accent-pending)">PROSSIMAMENTE</div>
-            <div class="text-sm" style="color: var(--fg-2)">
-              Esportazione XLSX dei risultati per percorso. Disponibile a breve. Nel
-              frattempo i tempi catturati vengono salvati localmente e sincronizzati
-              con il cloud.
-            </div>
-            <button class="btn-base mt-5" onclick={() => (view = 'timing')}>← TIMING</button>
-          </div>
+        <div class="h-full overflow-auto">
+          <ExportPage />
         </div>
       {/if}
     </main>

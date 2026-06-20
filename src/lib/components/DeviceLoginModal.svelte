@@ -4,6 +4,8 @@
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { onMount } from 'svelte';
   import type { DeviceCodeResponse } from '../types';
+  import Button from '../ui/Button.svelte';
+  import { t } from '../i18n';
 
   let { onClose }: { onClose: (success: boolean) => void } = $props();
   let resp = $state<DeviceCodeResponse | null>(null);
@@ -55,18 +57,18 @@
 <div class="modal-backdrop" role="dialog">
   <div class="panel-2 w-full max-w-xl">
     <div class="px-5 py-3 flex items-center justify-between border-b" style="border-color: var(--line-2)">
-      <div class="hud-strong" style="color: var(--accent-running)">ACCEDI VIA BROWSER</div>
-      <button class="btn-base btn-ghost text-xs" onclick={() => onClose(false)}>ESC</button>
+      <div class="hud-strong" style="color: var(--accent-running)">{$t.modals.deviceLogin.title}</div>
+      <Button variant="ghost" size="sm" onclick={() => onClose(false)}>ESC</Button>
     </div>
 
     <div class="p-6">
       {#if !resp && !error}
-        <div class="hud" style="color: var(--fg-2)">RICHIESTA DEVICE CODE…</div>
+        <div class="hud" style="color: var(--fg-2)">{$t.modals.deviceLogin.loadingCode}</div>
       {:else if error}
-        <div class="hud mb-2" style="color: var(--accent-finish)">ERRORE</div>
+        <div class="hud mb-2" style="color: var(--accent-finish)">{$t.common.error}</div>
         <div class="text-base" style="color: var(--fg-1)">{error}</div>
       {:else if resp}
-        <div class="hud mb-2">VISITA URL</div>
+        <div class="hud mb-2">{$t.modals.deviceLogin.visitUrl}</div>
         <button
           class="text-base mb-6 break-all underline text-left w-full"
           style="color: var(--accent-running)"
@@ -75,7 +77,7 @@
           {resp.verification_uri_complete ?? resp.verification_uri}
         </button>
 
-        <div class="hud mb-2">INSERISCI CODICE</div>
+        <div class="hud mb-2">{$t.modals.deviceLogin.enterCode}</div>
         <div
           class="chronodial num text-7xl tracking-[0.15em] py-4 px-6 panel"
           data-state="running"
@@ -85,15 +87,15 @@
         </div>
 
         <div class="flex items-center justify-between mt-6">
-          <div class="hud">SCADENZA</div>
+          <div class="hud">{$t.modals.deviceLogin.expiry}</div>
           <div class="num text-xl" style="color: {countdown > 60 ? 'var(--fg-0)' : 'var(--accent-finish)'}">
             {countdown}s
           </div>
         </div>
-        <div class="hud mt-1" style="color: var(--fg-3)">in attesa di conferma…</div>
+        <div class="hud mt-1" style="color: var(--fg-3)">{$t.modals.deviceLogin.waitingMessage}</div>
       {/if}
 
-      <button class="btn-base mt-6 w-full py-3" onclick={() => onClose(false)}>ANNULLA</button>
+      <Button class="mt-6 w-full py-3" onclick={() => onClose(false)}>{$t.common.cancel}</Button>
     </div>
   </div>
 </div>

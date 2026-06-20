@@ -1,6 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Race {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub scheduled_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Course {
     pub id: i64,
     pub name: String,
@@ -9,6 +17,9 @@ pub struct Course {
     pub scheduled_at_ms: Option<i64>,
     #[serde(default)]
     pub ended_at_ms: Option<i64>,
+    // Local-only link to a race; backend courses omit it (serde default = None).
+    #[serde(default)]
+    pub race_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,10 +29,33 @@ pub struct Athlete {
     pub first_name: String,
     pub last_name: String,
     pub course_id: i64,
+    #[serde(default)]
+    pub category: Option<String>,
+    #[serde(default)]
+    pub anonymous: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Checkpoint {
+    pub id: i64,
+    pub course_id: i64,
+    pub name: String,
+    pub position: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Split {
+    pub id: i64,
+    pub athlete_id: i64,
+    pub checkpoint_id: i64,
+    pub course_id: i64,
+    pub timestamp_ms: i64,
+    pub split_time_ms: Option<i64>,
+    pub operator_id: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum TimingStatus { Registered, Running, Finished, Withdrawn }
+pub enum TimingStatus { Registered, Running, Finished, Withdrawn, Dns }
 
 impl TimingStatus {
     pub fn as_str(&self) -> &'static str {
@@ -30,6 +64,7 @@ impl TimingStatus {
             Self::Running => "Running",
             Self::Finished => "Finished",
             Self::Withdrawn => "Withdrawn",
+            Self::Dns => "DNS",
         }
     }
     pub fn from_str(s: &str) -> Option<Self> {
@@ -38,6 +73,7 @@ impl TimingStatus {
             "Running" => Some(Self::Running),
             "Finished" => Some(Self::Finished),
             "Withdrawn" => Some(Self::Withdrawn),
+            "DNS" => Some(Self::Dns),
             _ => None,
         }
     }
