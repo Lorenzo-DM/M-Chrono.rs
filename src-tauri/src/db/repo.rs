@@ -324,7 +324,6 @@ impl Repo {
         Ok(rows.filter_map(Result::ok).collect())
     }
 
-    #[allow(dead_code)]
     pub fn insert_timing_running(&self, athlete_id: i64, course_id: i64,
                                   start_ms: i64, operator_id: &str) -> AppResult<i64> {
         let now = self.clock.now_ms();

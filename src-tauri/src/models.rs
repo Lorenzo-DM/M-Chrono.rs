@@ -106,10 +106,6 @@ pub struct PendingFinish {
     pub synced: bool,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserInfo { pub sub: String, pub name: Option<String>, pub email: Option<String> }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceCodeResponse {
     pub user_code: String,
