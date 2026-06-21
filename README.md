@@ -1,5 +1,8 @@
 # M-Chrono
 
+[![CI](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Desktop chronometry app for trail running races, built with **Tauri 2**,
 **Svelte 5**, and **Rust**.
 
@@ -38,10 +41,9 @@ src-tauri/src/         Rust backend
   import/              Roster import
 ```
 
-Full design and implementation notes:
+## Screenshots
 
-- `docs/superpowers/specs/2026-06-01-trail-race-timing-desktop-design.md`
-- `docs/superpowers/plans/2026-06-01-trail-race-timing-desktop.md`
+_Screenshots coming soon._
 
 ## Requirements
 
