@@ -1,6 +1,6 @@
 [package]
 name = "m-chrono"
-version = "0.1.0"
+version = "0.1.1"
 description = "M-Chrono — desktop chronometry for trail running races"
 authors = ["Lorenzo Della Mea"]
 edition = "2021"
