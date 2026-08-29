@@ -362,7 +362,7 @@
                         <div class="hud">{$t.settings.sync.oidcSection}</div>
                         <label class="flex flex-col gap-1">
                             <span class="hud">ISSUER_URL</span>
-                            <input bind:value={form.oidc_issuer_url} placeholder="https://example.zitadel.cloud" />
+                            <input bind:value={form.oidc_issuer_url} placeholder="https://idp.example.com" />
                         </label>
                         <label class="flex flex-col gap-1">
                             <span class="hud">CLIENT_ID</span>

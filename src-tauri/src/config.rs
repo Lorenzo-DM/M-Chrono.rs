@@ -19,7 +19,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            oidc_issuer_url: "https://example.zitadel.cloud".into(),
+            oidc_issuer_url: "https://idp.example.com".into(),
             oidc_client_id: "REPLACE_ME".into(),
             oidc_scopes: "openid profile email offline_access".into(),
             api_base_url: "https://api.example.com".into(),

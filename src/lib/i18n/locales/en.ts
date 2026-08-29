@@ -140,7 +140,7 @@ export const en: Translations = {
       toggleOffTitle: 'Local only',
       toggleOnLabel: 'ON',
       toggleOnTitle: 'Sync with backend',
-      oidcSection: 'OIDC (Zitadel)',
+      oidcSection: 'OIDC',
       apiSection: 'API',
       authSection: 'Authentication',
       loginActive: 'Login active',

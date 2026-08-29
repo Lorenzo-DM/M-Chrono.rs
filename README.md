@@ -22,7 +22,8 @@ captured by two operators running in parallel. Results export to XLSX and CSV.
 - **Checkpoints** — intermediate timing points along the course.
 - **Export** — XLSX and CSV results.
 - **Import** — athlete rosters from spreadsheets (XLSX/CSV).
-- **Auth** — OIDC device-code flow via Zitadel; tokens in the OS keychain.
+- **Auth** — OIDC device-code flow against any standards-compliant provider;
+  tokens in the OS keychain.
 - **i18n** — Italian (default) and English, switchable at runtime.
 
 ## Architecture
@@ -34,7 +35,7 @@ src/                  Svelte 5 frontend (UI, stores, i18n)
 src-tauri/src/         Rust backend
   timer/               Monotonic clock + timing events
   db/                  SQLite repo + migrations
-  auth/                OIDC device-code + refresh, keychain token store
+  auth/                OIDC discovery, device-code + refresh, keychain store
   sync/                Pull/push + dedup against the race API
   api/                 Authenticated HTTP client
   export/              XLSX + CSV writers
@@ -51,8 +52,8 @@ _Screenshots coming soon._
 - Node.js >= 20
 - [bun](https://bun.sh) (package manager; not pnpm/npm)
 - macOS, Linux, or Windows
-- A Zitadel instance with a Native client supporting the Device Authorization
-  Grant; refresh-token TTL >= 30 days
+- An OIDC provider with a public/native client that supports the Device
+  Authorization Grant (RFC 8628) and issues refresh tokens
 
 ## Development
 
@@ -82,7 +83,7 @@ Configure via the Settings UI or directly in `config.json`:
 
 | Key                   | Meaning                                              | Default |
 | --------------------- | ---------------------------------------------------- | ------- |
-| `oidc_issuer_url`     | e.g. `https://example.zitadel.cloud`                 | —       |
+| `oidc_issuer_url`     | OIDC issuer, e.g. `https://idp.example.com`          | —       |
 | `oidc_client_id`      | Native client ID                                     | —       |
 | `oidc_scopes`         | `openid profile email offline_access ...`            | —       |
 | `api_base_url`        | race API root                                        | —       |
@@ -95,14 +96,20 @@ Configure via the Settings UI or directly in `config.json`:
 The refresh token is stored in the OS keychain. Access tokens live in memory
 only.
 
-## Zitadel setup
+## OIDC provider setup
 
-1. Create a Native client in your project; enable the Device Authorization
-   Grant.
-2. In Token Settings: Refresh Token Expiration >= 30 days; Idle Expiration
-   >= 30 days (or disabled).
-3. Add a custom scope or audience for the race API; mirror it in `oidc_scopes`.
-4. Copy the `client_id` into `oidc_client_id`.
+Endpoints are resolved at runtime from the provider's discovery document at
+`<oidc_issuer_url>/.well-known/openid-configuration`, so no provider-specific
+URLs are hardcoded. Any provider that publishes a `device_authorization_endpoint`
+there works — Keycloak, Auth0, Okta, Entra ID, and others.
+
+1. Create a public (native) client and enable the Device Authorization Grant.
+2. Enable refresh tokens and set their lifetime to cover a race weekend
+   (>= 30 days recommended, with idle expiration disabled or equally long).
+3. Add the scope or audience your race API expects; mirror it in `oidc_scopes`
+   alongside `offline_access`.
+4. Copy the client ID into `oidc_client_id` and the issuer URL into
+   `oidc_issuer_url`.
 
 ## Internationalization
 
