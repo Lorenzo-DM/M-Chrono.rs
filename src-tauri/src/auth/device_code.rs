@@ -19,13 +19,12 @@ pub struct DeviceCodeInit {
 
 pub async fn request(
     http: &reqwest::Client,
-    issuer: &str,
+    device_authorization_endpoint: &str,
     client_id: &str,
     scopes: &str,
 ) -> AppResult<DeviceCodeInit> {
-    let url = format!("{}/oauth/v2/device_authorization", issuer.trim_end_matches('/'));
     let resp = http
-        .post(&url)
+        .post(device_authorization_endpoint)
         .form(&[("client_id", client_id), ("scope", scopes)])
         .send()
         .await?
@@ -75,17 +74,16 @@ struct PollForm<'a> {
 
 pub async fn poll_once(
     http: &reqwest::Client,
-    issuer: &str,
+    token_endpoint: &str,
     device_code: &str,
     client_id: &str,
 ) -> AppResult<PollOutcome> {
-    let url = format!("{}/oauth/v2/token", issuer.trim_end_matches('/'));
     let form = PollForm {
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         device_code,
         client_id,
     };
-    let resp = http.post(&url).form(&form).send().await?;
+    let resp = http.post(token_endpoint).form(&form).send().await?;
     let status = resp.status();
     if status.is_success() {
         Ok(PollOutcome::Success(resp.json().await?))

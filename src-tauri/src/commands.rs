@@ -278,6 +278,8 @@ pub async fn update_config(
     if let Some(v) = patch.dedup_warn_delta_ms { cfg.dedup_warn_delta_ms = v; }
     if let Some(v) = patch.sync_enabled        { cfg.sync_enabled = v; }
     cfg.save(&ctx.config_path)?;
+    // The provider may have changed: drop the cached discovery document.
+    ctx.auth.invalidate_endpoints().await;
     Ok(cfg.clone())
 }
 

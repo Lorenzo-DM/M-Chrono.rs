@@ -11,17 +11,16 @@ struct RefreshForm<'a> {
 
 pub async fn refresh(
     http: &reqwest::Client,
-    issuer: &str,
+    token_endpoint: &str,
     refresh_token: &str,
     client_id: &str,
 ) -> AppResult<TokenResponse> {
-    let url = format!("{}/oauth/v2/token", issuer.trim_end_matches('/'));
     let form = RefreshForm {
         grant_type: "refresh_token",
         refresh_token,
         client_id,
     };
-    let resp = http.post(&url).form(&form).send().await?;
+    let resp = http.post(token_endpoint).form(&form).send().await?;
     let status = resp.status();
     if status.is_success() {
         Ok(resp.json().await?)
