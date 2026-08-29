@@ -44,7 +44,11 @@ src-tauri/src/         Rust backend
 
 ## Screenshots
 
-_Screenshots coming soon._
+![Timing view: the 21K and 40K courses timed side by side, each with its own running clock and a queue of captured finishes awaiting bib assignment](docs/screenshots/timing.png)
+
+Two courses timed in parallel. Each lane keeps its own monotonic clock; finishes
+are captured first and matched to a bib afterwards, so the operator never has to
+type while runners are crossing.
 
 ## Requirements
 
