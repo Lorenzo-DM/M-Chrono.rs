@@ -3,6 +3,8 @@
     import { config, isAuthenticated as isAuthStore, courses } from "../stores";
     import { themeMode } from "../theme";
     import type { ThemeMode } from "../theme";
+    import { palette, PALETTES } from "../palette";
+    import type { Palette } from "../palette";
     import Button from "../ui/Button.svelte";
     import { TriangleAlert, Check, X } from 'lucide-svelte';
     import SegmentedControl from "../ui/SegmentedControl.svelte";
@@ -39,6 +41,12 @@
         { id: "sync"    as SettingsTab, label: $t.settings.tabs.sync },
     ]);
     let tab = $state<SettingsTab>("general");
+
+    let paletteTitles = $derived<Record<Palette, string>>({
+        stone: $t.settings.appearance.paletteStoneTitle,
+        slate: $t.settings.appearance.paletteSlateTitle,
+        nord:  $t.settings.appearance.paletteNordTitle,
+    });
 
     let saving = $state(false);
     let saved = $state(false);
@@ -219,6 +227,17 @@
                 ]}
                 value={$themeMode}
                 onChange={(v) => themeMode.set(v as ThemeMode)}
+            />
+            <div class="hud mt-4 mb-2">{$t.settings.appearance.palette}</div>
+            <SegmentedControl
+                ariaLabel={$t.settings.appearance.palette}
+                options={PALETTES.map((p) => ({
+                    value: p.value,
+                    label: p.label,
+                    title: paletteTitles[p.value],
+                }))}
+                value={$palette}
+                onChange={(v) => palette.set(v as Palette)}
             />
             <div class="hud mt-4 mb-2">{$t.settings.appearance.sound}</div>
             <SegmentedControl

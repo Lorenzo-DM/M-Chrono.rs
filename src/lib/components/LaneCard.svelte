@@ -842,12 +842,12 @@
     border-bottom: none;
   }
   .row-pending {
-    background: rgba(192, 138, 42, 0.08);
+    background: rgb(var(--accent-pending-rgb) / 0.08);
     border-left: 3px solid var(--accent-pending);
     padding-left: calc(0.75rem - 3px);
   }
   .row-pending:hover {
-    background: rgba(192, 138, 42, 0.14);
+    background: rgb(var(--accent-pending-rgb) / 0.14);
   }
   .row-finish {
     border-left: 3px solid transparent;
@@ -873,7 +873,7 @@
   }
   .pos-chip-done {
     background: var(--accent-running);
-    color: #f6f2e9;
+    color: var(--on-accent);
   }
   .row-time-col {
     display: flex;
@@ -952,27 +952,27 @@
   }
   .btn-row-confirm {
     color: var(--accent-start);
-    border-color: rgba(74, 140, 79, 0.35);
+    border-color: rgb(var(--accent-running-rgb) / 0.35);
   }
   .btn-row-confirm:hover {
     background: var(--accent-start);
-    color: #f6f2e9;
+    color: var(--on-accent);
     border-color: var(--accent-start);
   }
   .btn-row-danger:hover {
-    background: rgba(184, 85, 58, 0.12);
+    background: rgb(var(--accent-finish-rgb) / 0.12);
     color: var(--accent-finish);
-    border-color: rgba(184, 85, 58, 0.35);
+    border-color: rgb(var(--accent-finish-rgb) / 0.35);
   }
   .btn-row-danger:active {
-    background: rgba(184, 85, 58, 0.2);
+    background: rgb(var(--accent-finish-rgb) / 0.2);
   }
   .btn-row-warn {
     color: var(--accent-pending);
-    border-color: rgba(192, 138, 42, 0.4);
+    border-color: rgb(var(--accent-pending-rgb) / 0.4);
   }
   .btn-row-warn:hover {
-    background: rgba(192, 138, 42, 0.12);
+    background: rgb(var(--accent-pending-rgb) / 0.12);
     color: var(--accent-pending);
   }
   .row-anon {
@@ -1023,7 +1023,7 @@
   }
   .btn-tie:hover:not(:disabled) {
     background: var(--accent-pending);
-    color: #fbf8ed;
+    color: var(--on-accent);
     border-style: solid;
   }
   .btn-tie:active:not(:disabled) {

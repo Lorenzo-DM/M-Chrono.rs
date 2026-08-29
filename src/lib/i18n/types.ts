@@ -101,6 +101,10 @@ export interface Translations {
       themeAutoTitle: string;
       themeLightTitle: string;
       themeDarkTitle: string;
+      palette: string;
+      paletteStoneTitle: string;
+      paletteSlateTitle: string;
+      paletteNordTitle: string;
       sound: string;
       soundOnTitle: string;
       soundOffTitle: string;
