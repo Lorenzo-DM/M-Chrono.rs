@@ -117,7 +117,7 @@
         <Button
           class="flex-1 py-3"
           style={matches
-            ? `background: ${copy.ctaBg}; border-color: ${copy.ctaBg}; color: #f6f2e9`
+            ? `background: ${copy.ctaBg}; border-color: ${copy.ctaBg}; color: var(--on-accent)`
             : ''}
           disabled={!matches || busy}
           onclick={confirm}

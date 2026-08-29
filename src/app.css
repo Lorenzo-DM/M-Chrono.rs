@@ -6,6 +6,56 @@
 @import "@fontsource/ibm-plex-mono/600.css";
 @import "@fontsource/ibm-plex-mono/700.css";
 
+/* ============================================================
+   Color tokens
+
+   Two orthogonal axes on <html>:
+       data-theme   light | dark
+       data-palette stone | slate | nord
+
+   Structural tokens (radii, shadow geometry) live in the first
+   :root block and are never repeated per palette.
+
+   Every accent that needs a translucent tint also ships an
+   `-rgb` triplet, so tints follow the palette:
+       box-shadow: 0 0 0 3px rgb(var(--accent-running-rgb) / 0.18);
+
+   `--on-accent` is the text color on a filled accent surface.
+   Palette blocks deliberately omit `color-scheme`; that stays on
+   the theme axis alone.
+   ============================================================ */
+
+:root {
+    /* Radii */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-pill: 999px;
+
+    /* Shadows — geometry here, tint via --shadow-rgb per palette */
+    --shadow-sm: 0 1px 2px rgb(var(--shadow-rgb) / 0.06);
+    --shadow-md: 0 4px 12px rgb(var(--shadow-rgb) / 0.08);
+    --shadow-lg: 0 10px 30px rgb(var(--shadow-rgb) / 0.12);
+
+    /* Operator color codes — aliases, follow the active palette */
+    --op-a: var(--accent-running);
+    --op-b: var(--accent-warm);
+    --op-c: var(--accent-sky);
+    --op-d: var(--accent-pending);
+
+    /* Duplicate marker — alias */
+    --accent-dup: var(--accent-warn);
+}
+
+[data-theme="dark"] {
+    --shadow-sm: 0 1px 2px rgb(var(--shadow-rgb) / 0.25);
+    --shadow-md: 0 4px 12px rgb(var(--shadow-rgb) / 0.35);
+    --shadow-lg: 0 10px 30px rgb(var(--shadow-rgb) / 0.5);
+}
+
+/* ---------- Stone (default) ---------- */
+
 :root {
     color-scheme: light;
 
@@ -34,7 +84,6 @@
     --accent-finish:  #dc2626;
     --accent-pending: #d97706;
     --accent-warn:    #b91c1c;
-    --accent-dup:     var(--accent-warn);
     --accent-sky:     #0284c7;
 
     /* Accent hovers */
@@ -42,23 +91,14 @@
     --accent-pending-hover: #b45309;
     --accent-warn-hover:    #991b1b;
 
-    /* Operator color codes */
-    --op-a: var(--accent-running);
-    --op-b: var(--accent-warm);
-    --op-c: var(--accent-sky);
-    --op-d: var(--accent-pending);
+    /* Tint triplets */
+    --accent-running-rgb: 22 163 74;
+    --accent-pending-rgb: 217 119 6;
+    --accent-finish-rgb:  220 38 38;
+    --accent-warm-rgb:    234 88 12;
+    --shadow-rgb:         28 25 23;
 
-    /* Radii */
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
-    --radius-xl: 18px;
-    --radius-pill: 999px;
-
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.06);
-    --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.08);
-    --shadow-lg: 0 10px 30px rgba(28, 25, 23, 0.12);
+    --on-accent: #ffffff;
 }
 
 [data-theme="dark"] {
@@ -85,16 +125,175 @@
     --accent-finish:  #ef4444;
     --accent-pending: #f59e0b;
     --accent-warn:    #f87171;
-    --accent-dup:     var(--accent-warn);
     --accent-sky:     #38bdf8;
 
     --accent-running-hover: #16a34a;
     --accent-pending-hover: #d97706;
     --accent-warn-hover:    #ef4444;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --accent-running-rgb: 34 197 94;
+    --accent-pending-rgb: 245 158 11;
+    --accent-finish-rgb:  239 68 68;
+    --accent-warm-rgb:    251 146 60;
+    --shadow-rgb:         0 0 0;
+
+    --on-accent: #ffffff;
+}
+
+/* ---------- Slate — cool neutral greys, blue primary ---------- */
+
+[data-palette="slate"] {
+    --bg-0: #f8fafc;
+    --bg-1: #ffffff;
+    --bg-2: #f1f5f9;
+    --bg-3: #e2e8f0;
+    --bg-4: #cbd5e1;
+
+    --line-1: #e2e8f0;
+    --line-2: #cbd5e1;
+    --line-3: #94a3b8;
+
+    --fg-0: #0f172a;
+    --fg-1: #1e293b;
+    --fg-2: #475569;
+    --fg-3: #94a3b8;
+
+    --accent-running: #2563eb;
+    --accent-start:   #2563eb;
+    --accent-warm:    #db2777;
+    --accent-finish:  #dc2626;
+    --accent-pending: #7c3aed;
+    --accent-warn:    #b91c1c;
+    --accent-sky:     #0891b2;
+
+    --accent-running-hover: #1d4ed8;
+    --accent-pending-hover: #6d28d9;
+    --accent-warn-hover:    #991b1b;
+
+    --accent-running-rgb: 37 99 235;
+    --accent-pending-rgb: 124 58 237;
+    --accent-finish-rgb:  220 38 38;
+    --accent-warm-rgb:    219 39 119;
+    --shadow-rgb:         15 23 42;
+
+    --on-accent: #ffffff;
+}
+
+[data-palette="slate"][data-theme="dark"] {
+    --bg-0: #0f172a;
+    --bg-1: #1e293b;
+    --bg-2: #24334a;
+    --bg-3: #334155;
+    --bg-4: #475569;
+
+    --line-1: #24334a;
+    --line-2: #334155;
+    --line-3: #475569;
+
+    --fg-0: #f8fafc;
+    --fg-1: #e2e8f0;
+    --fg-2: #94a3b8;
+    --fg-3: #64748b;
+
+    --accent-running: #3b82f6;
+    --accent-start:   #3b82f6;
+    --accent-warm:    #f472b6;
+    --accent-finish:  #ef4444;
+    --accent-pending: #a78bfa;
+    --accent-warn:    #f87171;
+    --accent-sky:     #22d3ee;
+
+    --accent-running-hover: #2563eb;
+    --accent-pending-hover: #8b5cf6;
+    --accent-warn-hover:    #ef4444;
+
+    --accent-running-rgb: 59 130 246;
+    --accent-pending-rgb: 167 139 250;
+    --accent-finish-rgb:  239 68 68;
+    --accent-warm-rgb:    244 114 182;
+    --shadow-rgb:         0 0 0;
+
+    /* Accents run pale here — filled buttons need dark text. */
+    --on-accent: #0f172a;
+}
+
+/* ---------- Nord — Polar Night / Snow Storm / Frost / Aurora ----------
+   Nord ships no official light theme; the light variant darkens the
+   Aurora accents so white text on a filled button stays readable. */
+
+[data-palette="nord"] {
+    --bg-0: #e5e9f0;
+    --bg-1: #fbfcfe;
+    --bg-2: #eceff4;
+    --bg-3: #d8dee9;
+    --bg-4: #c2cad8;
+
+    --line-1: #dbe1ea;
+    --line-2: #c8d0de;
+    --line-3: #9aa6bb;
+
+    --fg-0: #2e3440;
+    --fg-1: #3b4252;
+    --fg-2: #4c566a;
+    --fg-3: #7b8494;
+
+    --accent-running: #5e7f4a;
+    --accent-start:   #5e7f4a;
+    --accent-warm:    #b5654a;
+    --accent-finish:  #a5424d;
+    --accent-pending: #97742d;
+    --accent-warn:    #8f3742;
+    --accent-sky:     #4c7399;
+
+    --accent-running-hover: #4c6a3a;
+    --accent-pending-hover: #7d5f24;
+    --accent-warn-hover:    #742c35;
+
+    --accent-running-rgb: 94 127 74;
+    --accent-pending-rgb: 151 116 45;
+    --accent-finish-rgb:  165 66 77;
+    --accent-warm-rgb:    181 101 74;
+    --shadow-rgb:         46 52 64;
+
+    --on-accent: #eceff4;
+}
+
+[data-palette="nord"][data-theme="dark"] {
+    --bg-0: #2e3440;
+    --bg-1: #3b4252;
+    --bg-2: #434c5e;
+    --bg-3: #4c566a;
+    --bg-4: #5a657a;
+
+    --line-1: #3f4859;
+    --line-2: #4c566a;
+    --line-3: #5e6a80;
+
+    --fg-0: #eceff4;
+    --fg-1: #d8dee9;
+    --fg-2: #a4aec1;
+    --fg-3: #7c879b;
+
+    --accent-running: #a3be8c;
+    --accent-start:   #a3be8c;
+    --accent-warm:    #d08770;
+    --accent-finish:  #bf616a;
+    --accent-pending: #ebcb8b;
+    --accent-warn:    #d1737b;
+    --accent-sky:     #88c0d0;
+
+    --accent-running-hover: #8fae76;
+    --accent-pending-hover: #dcb86e;
+    --accent-warn-hover:    #bf616a;
+
+    --accent-running-rgb: 163 190 140;
+    --accent-pending-rgb: 235 203 139;
+    --accent-finish-rgb:  191 97 106;
+    --accent-warm-rgb:    208 135 112;
+    --shadow-rgb:         0 0 0;
+
+    /* Aurora accents are pale — filled buttons need dark text. */
+    --on-accent: #2e3440;
 }
 
 body {
@@ -132,7 +331,7 @@ body {
         ),
         radial-gradient(
             ellipse at bottom right,
-            rgba(22, 163, 74, 0.04) 0%,
+            rgb(var(--accent-running-rgb) / 0.04) 0%,
             transparent 55%
         );
     background-attachment: fixed;
@@ -142,7 +341,7 @@ body {
     background-image:
         radial-gradient(
             ellipse at top,
-            rgba(34, 197, 94, 0.06) 0%,
+            rgb(var(--accent-running-rgb) / 0.06) 0%,
             transparent 55%
         ),
         radial-gradient(
@@ -222,37 +421,37 @@ body {
 
 .btn-primary {
     background: var(--accent-running);
-    color: #ffffff;
+    color: var(--on-accent);
     border-color: var(--accent-running);
 }
 .btn-primary:hover {
     background: var(--accent-running-hover);
     border-color: var(--accent-running-hover);
-    color: #ffffff;
+    color: var(--on-accent);
 }
 
 .btn-accent-start {
     background: var(--accent-start);
-    color: #ffffff;
+    color: var(--on-accent);
     border-color: var(--accent-start);
 }
 .btn-accent-start:hover {
     background: var(--accent-running-hover);
     border-color: var(--accent-running-hover);
-    color: #ffffff;
+    color: var(--on-accent);
 }
 
 .btn-accent-tap {
     background: var(--accent-pending);
     border-color: var(--accent-pending);
-    color: #ffffff;
+    color: var(--on-accent);
     font-weight: 700;
     box-shadow: var(--shadow-md);
 }
 .btn-accent-tap:hover {
     background: var(--accent-pending-hover);
     border-color: var(--accent-pending-hover);
-    color: #ffffff;
+    color: var(--on-accent);
 }
 .btn-accent-tap:active {
     background: var(--accent-pending);
@@ -264,7 +463,7 @@ body {
     color: var(--accent-finish);
 }
 .btn-accent-finish:hover {
-    background: rgba(220, 38, 38, 0.1);
+    background: rgb(var(--accent-finish-rgb) / 0.1);
 }
 
 .btn-ghost {
@@ -280,13 +479,13 @@ body {
 
 .btn-danger {
     background: var(--accent-warn);
-    color: #ffffff;
+    color: var(--on-accent);
     border-color: var(--accent-warn);
 }
 .btn-danger:hover {
     background: var(--accent-warn-hover);
     border-color: var(--accent-warn-hover);
-    color: #ffffff;
+    color: var(--on-accent);
 }
 
 .btn-sm {
@@ -324,7 +523,7 @@ input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
 select:focus,
 textarea:focus {
     border-color: var(--accent-running);
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+    box-shadow: 0 0 0 3px rgb(var(--accent-running-rgb) / 0.18);
     background-color: var(--bg-1);
 }
 input::placeholder,
@@ -373,7 +572,7 @@ select::-ms-expand {
 }
 .dot-running {
     background: var(--accent-running);
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+    box-shadow: 0 0 0 3px rgb(var(--accent-running-rgb) / 0.18);
 }
 .dot-idle {
     background: var(--fg-3);
@@ -387,11 +586,11 @@ select::-ms-expand {
     0%,
     100% {
         opacity: 1;
-        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+        box-shadow: 0 0 0 3px rgb(var(--accent-running-rgb) / 0.18);
     }
     50% {
         opacity: 0.7;
-        box-shadow: 0 0 0 6px rgba(22, 163, 74, 0.08);
+        box-shadow: 0 0 0 6px rgb(var(--accent-running-rgb) / 0.08);
     }
 }
 .dot-running {
@@ -401,13 +600,13 @@ select::-ms-expand {
 /* Capture flash */
 @keyframes capture-flash {
     0% {
-        background: rgba(217, 119, 6, 0);
+        background: rgb(var(--accent-pending-rgb) / 0);
     }
     10% {
-        background: rgba(217, 119, 6, 0.22);
+        background: rgb(var(--accent-pending-rgb) / 0.22);
     }
     100% {
-        background: rgba(217, 119, 6, 0);
+        background: rgb(var(--accent-pending-rgb) / 0);
     }
 }
 .flash-capture {

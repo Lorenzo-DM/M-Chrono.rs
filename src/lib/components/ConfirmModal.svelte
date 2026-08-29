@@ -45,7 +45,7 @@
         <Button
           class="flex-1 py-3"
           style={danger
-            ? 'background: var(--accent-finish); border-color: var(--accent-finish); color: #f6f2e9'
+            ? 'background: var(--accent-finish); border-color: var(--accent-finish); color: var(--on-accent)'
             : ''}
           onclick={onConfirm}
         >
