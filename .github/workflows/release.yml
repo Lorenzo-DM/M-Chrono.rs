@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Sync version from tag
+      - name: Verify version matches tag
         shell: bash
         env:
           TAG: ${{ github.event.release.tag_name }}
@@ -35,11 +35,27 @@ jobs:
             [0-9]*.[0-9]*.[0-9]*) ;;
             *) echo "::error::tag '$TAG' is not a semver version"; exit 1 ;;
           esac
-          jq --arg v "$V" '.version = $v' src-tauri/tauri.conf.json > tmp && mv tmp src-tauri/tauri.conf.json
-          jq --arg v "$V" '.version = $v' package.json > tmp && mv tmp package.json
-          awk -v v="$V" '!d && /^version = / { print "version = \"" v "\""; d=1; next } 1' \
-            src-tauri/Cargo.toml > tmp && mv tmp src-tauri/Cargo.toml
-          echo "Building version $V from tag $TAG"
+
+          CONF_V=$(jq -r '.version' src-tauri/tauri.conf.json)
+          PKG_V=$(jq -r '.version' package.json)
+          CARGO_V=$(awk -F'"' '/^version = /{print $2; exit}' src-tauri/Cargo.toml)
+
+          fail=0
+          for entry in "src-tauri/tauri.conf.json:$CONF_V" "package.json:$PKG_V" "src-tauri/Cargo.toml:$CARGO_V"; do
+            file="${entry%%:*}"
+            v="${entry##*:}"
+            if [ "$v" != "$V" ]; then
+              echo "::error file=$file::$file declares version $v, but tag $TAG expects $V"
+              fail=1
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::version manifests disagree with tag $TAG. Bump the version in tauri.conf.json, package.json, and Cargo.toml in a commit before tagging the release, then re-tag."
+            exit 1
+          fi
+
+          echo "Tag $TAG matches all manifests. Building version $V."
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'

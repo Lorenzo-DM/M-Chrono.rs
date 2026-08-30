@@ -3,28 +3,71 @@
 [![CI](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Desktop chronometry app for trail running races, built with **Tauri 2**,
-**Svelte 5**, and **Rust**.
+![Timing view: the 21K and 40K courses timed side by side, each with its own running clock and a queue of captured finishes awaiting bib assignment](docs/screenshots/timing.png)
 
-M-Chrono is offline-first: every timing event is captured locally and persisted
-to SQLite, so the app keeps working with no network. When connectivity is
-available it syncs bidirectionally with a race API, deduplicating events
-captured by two operators running in parallel. Results export to XLSX and CSV.
+A trail race finish line, timed by two volunteers on two laptops, with no
+mobile signal. The usual answer is two paper logs reconciled by hand that
+night, hoping the bib numbers and times line up.
+
+M-Chrono runs fully offline with zero configuration: every timing event is
+captured locally to SQLite on each laptop, so the app works with no network
+and no setup. When a laptop later gets connectivity, it can sync to a shared
+race API and the two logs merge automatically, with duplicate finishes
+flagged for review — but that sync is optional, not something the app needs
+in order to function.
+
+Built with Tauri 2, Svelte 5, and Rust.
 
 ## Features
 
 - **Precise timing** — start/finish capture with a monotonic clock, multiple
   timing lanes, and per-athlete splits.
 - **Offline-first** — local SQLite store; no data loss without network.
-- **Dual-operator sync** — two desktops time the same race; events merge with a
-  sliding-window dedup that flags suspicious deltas for manual review.
+- **Dual-operator sync (optional)** — two desktops time the same race; when
+  cloud sync is enabled, events merge automatically with a sliding-window
+  dedup that flags suspicious deltas for manual review.
 - **Bib management** — assign, reassign, and import athlete/bib lists.
 - **Checkpoints** — intermediate timing points along the course.
 - **Export** — XLSX and CSV results.
 - **Import** — athlete rosters from spreadsheets (XLSX/CSV).
-- **Auth** — OIDC device-code flow against any standards-compliant provider;
-  tokens in the OS keychain.
+- **Auth (optional)** — OIDC device-code flow against any standards-compliant
+  provider; tokens in the OS keychain. Only used if cloud sync is enabled.
 - **i18n** — Italian (default) and English, switchable at runtime.
+
+## Download
+
+Pre-built binaries are on the
+[latest release](https://github.com/Lorenzo-DM/M-Chrono.rs/releases/latest):
+
+- macOS — universal `.dmg`, or `.app.tar.gz`
+- Linux — `.AppImage`, `.deb`, or `.rpm`
+- Windows — `.msi`, or `.exe` (NSIS installer)
+
+No account or configuration is required to run the app.
+
+## Requirements
+
+To build from source (see [Download](#download) above for pre-built binaries):
+
+- Rust stable (>= 1.78)
+- Node.js >= 20
+- [bun](https://bun.sh) (package manager; not pnpm/npm)
+- macOS, Linux, or Windows
+
+## Development
+
+```bash
+bun install
+bun run tauri dev
+```
+
+## Build
+
+```bash
+bun run tauri build
+```
+
+Artifacts land under `src-tauri/target/release/bundle/`.
 
 ## Architecture
 
@@ -42,38 +85,6 @@ src-tauri/src/         Rust backend
   import/              Roster import
 ```
 
-## Screenshots
-
-![Timing view: the 21K and 40K courses timed side by side, each with its own running clock and a queue of captured finishes awaiting bib assignment](docs/screenshots/timing.png)
-
-Two courses timed in parallel. Each lane keeps its own monotonic clock; finishes
-are captured first and matched to a bib afterwards, so the operator never has to
-type while runners are crossing.
-
-## Requirements
-
-- Rust stable (>= 1.78)
-- Node.js >= 20
-- [bun](https://bun.sh) (package manager; not pnpm/npm)
-- macOS, Linux, or Windows
-- An OIDC provider with a public/native client that supports the Device
-  Authorization Grant (RFC 8628) and issues refresh tokens
-
-## Development
-
-```bash
-bun install
-bun run tauri dev
-```
-
-## Build
-
-```bash
-bun run tauri build
-```
-
-Artifacts land under `src-tauri/target/release/bundle/`.
-
 ## Configuration
 
 First launch writes `config.json` under the OS app data dir
@@ -83,7 +94,9 @@ First launch writes `config.json` under the OS app data dir
 - Linux: `~/.local/share/com.mchrono.app/`
 - Windows: `%APPDATA%\com.mchrono.app\`
 
-Configure via the Settings UI or directly in `config.json`:
+Configure via the Settings UI or directly in `config.json`. `operator_id`
+applies regardless of sync; the rest only matters if you enable cloud sync
+(see below).
 
 | Key                   | Meaning                                              | Default |
 | --------------------- | ---------------------------------------------------- | ------- |
@@ -100,7 +113,12 @@ Configure via the Settings UI or directly in `config.json`:
 The refresh token is stored in the OS keychain. Access tokens live in memory
 only.
 
-## OIDC provider setup
+## Cloud sync (optional)
+
+Cloud sync is disabled by default (`sync_enabled: false`) and the app is
+fully functional without it. Enable it only if you want two laptops' timing
+logs to merge automatically through a shared race API instead of being
+reconciled by hand.
 
 Endpoints are resolved at runtime from the provider's discovery document at
 `<oidc_issuer_url>/.well-known/openid-configuration`, so no provider-specific
@@ -114,6 +132,7 @@ there works — Keycloak, Auth0, Okta, Entra ID, and others.
    alongside `offline_access`.
 4. Copy the client ID into `oidc_client_id` and the issuer URL into
    `oidc_issuer_url`.
+5. Set `sync_enabled: true` in `config.json` (or via the Settings UI).
 
 ## Internationalization
 
@@ -132,3 +151,13 @@ bun run test --run                                # Svelte frontend (vitest)
 
 Daily-rotated log files are written to `<app_data_dir>/logs/race.log.<date>`.
 Filter via `RUST_LOG`, e.g. `RUST_LOG=m_chrono_lib=debug`.
+
+## Roadmap
+
+- Category rankings and printable results — overall, per-category, and
+  male/female rankings, printable for the award ceremony. Design not
+  finalized yet.
+- Sync protocol documentation — the exact contract the client expects from
+  the race API (endpoints, payloads, auth, conflict/dedup semantics), so a
+  third party can implement a compatible server. The API itself is not part
+  of this repo.
