@@ -3,6 +3,8 @@
 [![CI](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Lorenzo-DM/M-Chrono.rs/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![Timing view: the 21K and 40K courses timed side by side, each with its own running clock and a queue of captured finishes awaiting bib assignment](docs/screenshots/timing.png)
+
 A trail race finish line, timed by two volunteers on two laptops, with no
 mobile signal. The usual answer is two paper logs reconciled by hand that
 night, hoping the bib numbers and times line up.
@@ -15,14 +17,6 @@ flagged for review — but that sync is optional, not something the app needs
 in order to function.
 
 Built with Tauri 2, Svelte 5, and Rust.
-
-## Screenshots
-
-![Timing view: the 21K and 40K courses timed side by side, each with its own running clock and a queue of captured finishes awaiting bib assignment](docs/screenshots/timing.png)
-
-Two courses timed in parallel. Each lane keeps its own monotonic clock; finishes
-are captured first and matched to a bib afterwards, so the operator never has to
-type while runners are crossing.
 
 ## Features
 
@@ -157,3 +151,13 @@ bun run test --run                                # Svelte frontend (vitest)
 
 Daily-rotated log files are written to `<app_data_dir>/logs/race.log.<date>`.
 Filter via `RUST_LOG`, e.g. `RUST_LOG=m_chrono_lib=debug`.
+
+## Roadmap
+
+- Category rankings and printable results — overall, per-category, and
+  male/female rankings, printable for the award ceremony. Design not
+  finalized yet.
+- Sync protocol documentation — the exact contract the client expects from
+  the race API (endpoints, payloads, auth, conflict/dedup semantics), so a
+  third party can implement a compatible server. The API itself is not part
+  of this repo.
